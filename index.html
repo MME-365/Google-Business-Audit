@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google Business Profile Auditor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom font for a more professional look */
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      @media print {
+        body {
+          background-color: white !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        header, footer, #services-section, #action-buttons, form, #email-gate {
+            display: none !important;
+        }
+        main {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+        }
+        .page-container {
+            max-width: 100% !important;
+            padding: 0.5in !important;
+        }
+        section {
+          page-break-inside: avoid;
+        }
+        .bg-gray-50, .bg-white {
+          background-color: transparent !important;
+        }
+        .shadow-sm, .shadow-lg {
+          box-shadow: none !important;
+        }
+        .border, .border-l-4 {
+          border-color: #ccc !important;
+        }
+         .border-indigo-500 {
+           border-color: #6366f1 !important;
+         }
+        h1, h2, h3 {
+          color: black !important;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

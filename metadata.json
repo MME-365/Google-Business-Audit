@@ -1,0 +1,5 @@
+{
+  "name": "Google Business Profile Auditor",
+  "description": "An embeddable tool to audit a user's Google Business Profile, providing a score from 1-100, actionable recommendations, and promoting related SEO services.",
+  "requestFramePermissions": []
+}
