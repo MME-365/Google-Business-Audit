@@ -38,13 +38,14 @@ const auditResponseSchema = {
   required: ['overallScore', 'auditBreakdown', 'recommendations']
 };
 
-export const getGbpAudit = async (businessName: string, location: string): Promise<AuditResult> => {
+export const getGbpAudit = async (businessName: string, location: string, phoneNumber: string): Promise<AuditResult> => {
   const prompt = `
     Act as a world-class Google Business Profile (GBP) optimization expert.
 
     You cannot access the live internet. Generate a plausible, highly detailed, and hypothetical audit for a business with the following details:
     - Business Name: "${businessName}"
     - Location: "${location}"
+    - Phone Number: "${phoneNumber}"
 
     Infer the business's industry from its name (e.g., restaurant, law firm, retail shop). Your audit MUST reflect the nuances of that specific industry.
 

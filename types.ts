@@ -1,4 +1,5 @@
 
+
 export interface AuditBreakdownItem {
   category: string;
   score: number;
@@ -14,4 +15,12 @@ export interface AuditResult {
   overallScore: number;
   auditBreakdown: AuditBreakdownItem[];
   recommendations: Recommendation[];
+}
+
+export interface AuditEntry {
+  email: string;
+  businessName: string;
+  location: string;
+  phoneNumber: string;
+  timestamp: string;
 }

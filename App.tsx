@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [businessName, setBusinessName] = useState('');
   const [location, setLocation] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
@@ -21,9 +22,11 @@ const App: React.FC = () => {
     const storedEmail = localStorage.getItem('gbp-auditor-email');
     const storedBusinessName = localStorage.getItem('gbp-auditor-businessName');
     const storedLocation = localStorage.getItem('gbp-auditor-location');
+    const storedPhoneNumber = localStorage.getItem('gbp-auditor-phoneNumber');
     if (storedEmail) setEmail(storedEmail);
     if (storedBusinessName) setBusinessName(storedBusinessName);
     if (storedLocation) setLocation(storedLocation);
+    if (storedPhoneNumber) setPhoneNumber(storedPhoneNumber);
   }, []);
 
   useEffect(() => {
@@ -32,11 +35,12 @@ const App: React.FC = () => {
         localStorage.setItem('gbp-auditor-email', email);
         localStorage.setItem('gbp-auditor-businessName', businessName);
         localStorage.setItem('gbp-auditor-location', location);
+        localStorage.setItem('gbp-auditor-phoneNumber', phoneNumber);
     }
-  }, [email, businessName, location, auditResult]);
+  }, [email, businessName, location, phoneNumber, auditResult]);
 
   const handleAudit = async () => {
-    if (!businessName || !location || !email) {
+    if (!businessName || !location || !email || !phoneNumber) {
       setError('Please fill out all fields.');
       return;
     }
@@ -45,7 +49,7 @@ const App: React.FC = () => {
     setAuditResult(null);
 
     try {
-      const result = await getGbpAudit(businessName, location);
+      const result = await getGbpAudit(businessName, location, phoneNumber);
       setAuditResult(result);
       
       // Save audit details to persistent history
@@ -53,6 +57,7 @@ const App: React.FC = () => {
         email,
         businessName,
         location,
+        phoneNumber,
         timestamp: new Date().toISOString(),
       };
       const storedHistory = localStorage.getItem('gbp-audit-history');
@@ -64,6 +69,7 @@ const App: React.FC = () => {
       localStorage.removeItem('gbp-auditor-email');
       localStorage.removeItem('gbp-auditor-businessName');
       localStorage.removeItem('gbp-auditor-location');
+      localStorage.removeItem('gbp-auditor-phoneNumber');
     } catch (err) {
       console.error(err);
       setError('Failed to perform audit. The AI model may be busy. Please try again later.');
@@ -77,6 +83,7 @@ const App: React.FC = () => {
     setBusinessName('');
     setLocation('');
     setEmail('');
+    setPhoneNumber('');
     setError(null);
   };
 
@@ -121,6 +128,8 @@ const App: React.FC = () => {
               setLocation={setLocation}
               email={email}
               setEmail={setEmail}
+              phoneNumber={phoneNumber}
+              setPhoneNumber={setPhoneNumber}
               onAudit={handleAudit}
               isLoading={isLoading}
             />

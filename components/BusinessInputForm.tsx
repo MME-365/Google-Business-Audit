@@ -7,6 +7,8 @@ interface BusinessInputFormProps {
   setLocation: (value: string) => void;
   email: string;
   setEmail: (value: string) => void;
+  phoneNumber: string;
+  setPhoneNumber: (value: string) => void;
   onAudit: () => void;
   isLoading: boolean;
 }
@@ -18,6 +20,8 @@ const BusinessInputForm: React.FC<BusinessInputFormProps> = ({
   setLocation,
   email,
   setEmail,
+  phoneNumber,
+  setPhoneNumber,
   onAudit,
   isLoading,
 }) => {
@@ -67,6 +71,20 @@ const BusinessInputForm: React.FC<BusinessInputFormProps> = ({
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g., Brooklyn, NY"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition bg-white text-black placeholder:text-gray-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+            Business Phone Number
+          </label>
+          <input
+            id="phoneNumber"
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="e.g., (555) 123-4567"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition bg-white text-black placeholder:text-gray-500"
             required
           />
