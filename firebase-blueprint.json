@@ -1,0 +1,29 @@
+{
+  "entities": {
+    "Lead": {
+      "title": "Audit Lead",
+      "description": "Represents a business that has requested an audit.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who requested the audit." },
+        "businessName": { "type": "string" },
+        "location": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "website": { "type": "string" },
+        "overallScore": { "type": "number" },
+        "auditBreakdown": { "type": "array" },
+        "recommendations": { "type": "array" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "businessName", "location", "email", "phoneNumber", "timestamp", "overallScore"]
+    }
+  },
+  "firestore": {
+    "/leads/{leadId}": {
+      "path": "/leads/{leadId}",
+      "schema": "Lead",
+      "description": "Collection of all audit leads."
+    }
+  }
+}

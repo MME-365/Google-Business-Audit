@@ -1,70 +1,855 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Business Profile Auditor</title>
+    
+    <script>
+        // Infrastructure Shield: Suppress noise from browser extensions (MetaMask, Wallet, etc.)
+        (function() {
+            const isExtensionNoise = (msg) => {
+                if (!msg || typeof msg !== 'string') return false;
+                const low = msg.toLowerCase();
+                return low.includes('metamask') || low.includes('ethereum') || 
+                       low.includes('web3') || low.includes('wallet') ||
+                       (low.includes('failed to connect') && low.includes('extension'));
+            };
+
+            // Global Error Shield
+            window.onerror = function(msg, url, line, col, error) {
+                if (isExtensionNoise(msg)) return true;
+                console.error('Core Error:', msg, { url, line, col, error });
+                return false;
+            };
+            window.onunhandledrejection = function(e) {
+                const msg = e.reason && (e.reason.message || e.reason);
+                if (isExtensionNoise(msg)) { e.preventDefault(); return true; }
+            };
+
+            // Console Shield
+            ['error', 'warn', 'info'].forEach(m => {
+                const orig = console[m];
+                console[m] = (...args) => {
+                    const combined = args.map(a => {
+                        try { return typeof a === 'string' ? a : JSON.stringify(a); } catch (e) { return String(a); }
+                    }).join(' ');
+                    if (isExtensionNoise(combined)) return;
+                    orig.apply(console, args);
+                };
+            });
+
+            // Mock Provider to preempt extension injection and stop connection errors
+            if (!window.ethereum) {
+                const silent = { request: () => Promise.resolve([]), on: () => {}, removeListener: () => {}, isMetaMask: false };
+                try {
+                    Object.defineProperty(window, 'ethereum', { value: silent, writable: false, configurable: false });
+                } catch (e) { window.ethereum = silent; }
+            }
+        })();
+    </script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load React, ReactDOM, and HTM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/htm"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
+    
     <style>
-      /* Custom font for a more professional look */
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-      body {
-        font-family: 'Inter', sans-serif;
-      }
-      @media print {
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        :root {
+            --font-sans: 'Inter', sans-serif;
+        }
+
         body {
-          background-color: white !important;
-          padding: 0 !important;
-          margin: 0 !important;
+            font-family: var(--font-sans);
+            background-color: #f9fafb; /* bg-gray-50 */
+            color: #111827; /* text-gray-900 */
         }
-        header, footer, #services-section, #action-buttons, form, #email-gate {
-            display: none !important;
+
+        .glass-card {
+            background-color: white;
+            border-width: 1px;
+            border-color: #f3f4f6; /* gray-100 */
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+            border-radius: 1.5rem; /* rounded-3xl */
+            overflow: hidden;
         }
-        main {
-            box-shadow: none !important;
-            border: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border-radius: 0 !important;
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; }
+            .glass-card { border: none !important; box-shadow: none !important; }
         }
-        .page-container {
-            max-width: 100% !important;
-            padding: 0.5in !important;
+
+        /* Animation utilities */
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        section {
-          page-break-inside: avoid;
+
+        .spin-slow { animation: spin 3s linear infinite; }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
-        .bg-gray-50, .bg-white {
-          background-color: transparent !important;
-        }
-        .shadow-sm, .shadow-lg {
-          box-shadow: none !important;
-        }
-        .border, .border-l-4 {
-          border-color: #ccc !important;
-        }
-         .border-indigo-500 {
-           border-color: #6366f1 !important;
-         }
-        h1, h2, h3 {
-          color: black !important;
-        }
-      }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
-    "recharts": "https://aistudiocdn.com/recharts@^3.3.0"
-  }
-}
-</script>
 </head>
-  <body class="bg-gray-50">
+<body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        (async () => {
+            // Inlined config for robust embedding and cross-origin persistence
+            const firebaseConfig = {
+                "projectId": "gen-lang-client-0434515960",
+                "appId": "1:432580043057:web:df245eb613c174e3f45010",
+                "apiKey": "AIzaSyBu1VycAeFh_r4P2MUqwhcDgqsVddosyYw",
+                "authDomain": "gen-lang-client-0434515960.firebaseapp.com",
+                "firestoreDatabaseId": "ai-studio-1abe2321-9c2d-465b-96e1-49ab72e1b614",
+                "storageBucket": "gen-lang-client-0434515960.firebasestorage.app",
+                "messagingSenderId": "432580043057",
+                "measurementId": ""
+            };
+            
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+            const { useState, useEffect, useMemo, useRef } = React;
+            const html = htm.bind(React.createElement);
+
+            // Base URL for API calls - handles embedding scenarios
+            const API_BASE = window.location.origin.includes('googleusercontent.com') || window.location.origin === 'null' || window.location.origin.includes('google.com')
+                ? 'https://ais-pre-73znvcamjvfsvrgkk3t6vr-290434633557.us-east1.run.app' 
+                : window.location.origin;
+
+        // --- ICON HELPER ---
+        // The UMD build of lucide-react exposes window.LucideReact
+        const getIcon = (name) => {
+            if (window.LucideReact && window.LucideReact[name]) {
+                return window.LucideReact[name];
+            }
+            // Fallback: Return a simple functional component that renders null or a placeholder
+            // to avoid React Error #130 (Element type is invalid)
+            return (props) => React.createElement('span', { ...props, 'data-missing-icon': name });
+        };
+
+        const SettingsIcon = getIcon('Settings');
+        const BarChartIcon = getIcon('BarChart3');
+        const RocketIcon = getIcon('Rocket');
+        const TargetIcon = getIcon('Target');
+        const ExternalLinkIcon = getIcon('ExternalLink');
+        const CheckCircleIcon = getIcon('CheckCircle2');
+        const DownloadIcon = getIcon('Download');
+        const RefreshIcon = getIcon('RefreshCcw');
+        const MailIcon = getIcon('Mail');
+        const PhoneIcon = getIcon('Phone');
+        const MapPinIcon = getIcon('MapPin');
+        const BuildingIcon = getIcon('Building2');
+        const XIcon = getIcon('X');
+        const TrashIcon = getIcon('Trash2');
+        const SearchIcon = getIcon('Search');
+        const LogOutIcon = getIcon('LogOut');
+        const GoogleIcon = (props) => html`
+            <svg ...props viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .67-2.28 1.07-3.71 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.11c-.22-.66-.35-1.35-.35-2.06 0-.71.13-1.4.35-2.06V7.15H2.18C1.43 8.62 1 10.26 1 12s.43 3.38 1.18 4.85l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.15l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+        `;
+
+        // --- COMPONENTS ---
+
+        const LoginView = ({ onLogin }) => html`
+            <div className="flex flex-col items-center justify-center py-20 px-6 max-w-2xl mx-auto">
+                <div className="glass-card p-12 text-center space-y-8 w-full">
+                    <div className="space-y-4">
+                        <div className="inline-block p-4 bg-red-50 rounded-3xl text-red-600 mb-4">
+                            <${BuildingIcon} size=${48} />
+                        </div>
+                        <h2 className="text-4xl font-black text-gray-900 tracking-tight">Identity Required</h2>
+                        <p className="text-gray-500 text-lg leading-relaxed">
+                            Sign in with Google to access our precision auditing signals and secure your lead data.
+                        </p>
+                    </div>
+                    
+                    <button 
+                        onClick=${onLogin}
+                        className="w-full py-5 bg-white border-2 border-gray-100 hover:border-red-100 hover:bg-gray-50 text-gray-900 rounded-2xl font-black text-lg transition-all active:scale-[0.98] flex items-center justify-center gap-4 shadow-sm"
+                    >
+                        <${GoogleIcon} /> Continue with Google
+                    </button>
+                    
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                        Secure Authentication • Google Identity
+                    </p>
+                </div>
+            </div>
+        `;
+
+        const Loader = () => html`
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm animate-pulse">
+                <div className="relative">
+                    <${SettingsIcon} size=${48} className="text-red-600 spin-slow" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+                    </div>
+                </div>
+                <h3 className="mt-6 text-xl font-bold text-gray-900">Conducting Deep Audit...</h3>
+                <p className="mt-2 text-gray-500">Analyzing GMB signals and local SEO performance</p>
+                <div className="mt-8 flex gap-2">
+                    <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                </div>
+            </div>
+        `;
+
+        const ServiceCard = ({ title, description, price, iconType }) => html`
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col h-full group">
+                <div className="flex items-center space-x-4 mb-6">
+                    <div className="p-3 bg-red-50 rounded-2xl text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                        <${iconType} size=${28} />
+                    </div>
+                    <h3 className="text-xl font-black text-gray-900 leading-tight">${title}</h3>
+                </div>
+                <p className="text-gray-600 flex-grow mb-8 leading-relaxed">${description}</p>
+                <div className="flex justify-between items-center pt-6 border-t border-gray-50 mt-auto">
+                    <div className="flex flex-col">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Starts at</span>
+                        <span className="text-3xl font-black text-gray-900">$${price}</span>
+                    </div>
+                    <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 active:scale-95">
+                        Order <${ExternalLinkIcon} size=${18} />
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const ScoreCircle = ({ score }) => {
+            const radius = 85;
+            const stroke = 14;
+            const normalizedRadius = radius - stroke * 2;
+            const circumference = normalizedRadius * 2 * Math.PI;
+            const strokeDashoffset = circumference - (score / 100) * circumference;
+
+            const getColor = (s) => {
+                if (s < 40) return '#ef4444';
+                if (s < 75) return '#f59e0b';
+                return '#10b981';
+            };
+
+            return html`
+                <div className="relative flex items-center justify-center">
+                    <svg height=${radius * 2} width=${radius * 2} className="transform -rotate-90">
+                        <circle
+                            stroke="#f3f4f6"
+                            fill="transparent"
+                            strokeWidth=${stroke}
+                            r=${normalizedRadius}
+                            cx=${radius}
+                            cy=${radius}
+                        />
+                        <circle
+                            stroke=${getColor(score)}
+                            fill="transparent"
+                            strokeWidth=${stroke}
+                            strokeDasharray=${circumference + ' ' + circumference}
+                            style=${{ strokeDashoffset: strokeDashoffset, transition: 'stroke-dashoffset 1.5s ease-out' }}
+                            strokeLinecap="round"
+                            r=${normalizedRadius}
+                            cx=${radius}
+                            cy=${radius}
+                        />
+                    </svg>
+                    <div className="absolute flex flex-col items-center">
+                        <span className="text-5xl font-black" style=${{ color: getColor(score) }}>${score}</span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">/ 100</span>
+                    </div>
+                </div>
+            `;
+        };
+
+        const AuditResultView = ({ result, businessName, onReset }) => {
+            const handlePrint = () => window.print();
+            const [isEmailing, setIsEmailing] = useState(false);
+            const [emailSent, setEmailSent] = useState(false);
+
+            const handleEmailSummary = async () => {
+                setIsEmailing(true);
+                try {
+                    const response = await fetch(`${API_BASE}/api/email-summary`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ result, businessName })
+                    });
+                    if (response.ok) setEmailSent(true);
+                } catch (err) {
+                    console.error("Email failed", err);
+                } finally {
+                    setIsEmailing(false);
+                }
+            };
+
+            return html`
+                <div className="fade-in space-y-12">
+                    <div className="text-center space-y-4">
+                        <h2 className="text-3xl font-black text-gray-900">Audit Complete</h2>
+                        <p className="text-gray-500 max-w-lg mx-auto">Expert analysis for <span className="font-bold text-red-600">${businessName}</span> using multi-point GBP signals.</p>
+                    </div>
+
+                    <div className="flex justify-center py-6">
+                        <${ScoreCircle} score=${result.overallScore} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="glass-card p-8 bg-gray-50/50">
+                            <h3 className="text-2xl font-black text-gray-900 mb-8 flex items-center gap-3">
+                                <${BarChartIcon} className="text-red-600" />
+                                Metric Breakdown
+                            </h3>
+                            <div className="space-y-8">
+                                ${result.auditBreakdown.map((item, idx) => html`
+                                    <div key=${idx} className="space-y-3">
+                                        <div className="flex justify-between items-end">
+                                            <span className="font-bold text-gray-700">${item.category}</span>
+                                            <span className="font-black text-red-600">${item.score}%</span>
+                                        </div>
+                                        <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-red-600 rounded-full transition-all duration-1000"
+                                                style=${{ width: item.score + '%' }}
+                                            />
+                                        </div>
+                                        <p className="text-sm text-gray-500 leading-relaxed">${item.comment}</p>
+                                    </div>
+                                `)}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <h3 className="text-2xl font-black text-gray-900 mb-2 flex items-center gap-3">
+                                <${TargetIcon} className="text-emerald-600" />
+                                Actionable Roadmap
+                            </h3>
+                            ${result.recommendations.map((rec, idx) => html`
+                                <div key=${idx} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex gap-5 hover:border-red-100 transition-colors">
+                                    <div className="mt-1 flex-shrink-0 text-emerald-500">
+                                        <${CheckCircleIcon} size=${28} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h4 className="font-black text-gray-900 text-lg">${rec.title}</h4>
+                                        <p className="text-gray-600 text-sm leading-relaxed">${rec.description}</p>
+                                    </div>
+                                </div>
+                            `)}
+                        </div>
+                    </div>
+
+                    <div id="action-buttons" className="no-print bg-red-950 rounded-[40px] p-12 text-white text-center shadow-2xl space-y-8 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-red-500 opacity-10 rounded-full"></div>
+                        <div className="relative">
+                            <h2 className="text-4xl font-black mb-4">Protect Your Rankings</h2>
+                            <p className="text-red-200 max-w-xl mx-auto text-lg">
+                                Download this expert report, email a summary, or start a fresh audit.
+                            </p>
+                        </div>
+                        
+                        <div className="flex flex-wrap justify-center gap-5 relative">
+                            <button 
+                                onClick=${handlePrint}
+                                className="bg-white text-red-950 px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-red-50 transition-all active:scale-95"
+                            >
+                                <${DownloadIcon} size=${20} /> Save as PDF
+                            </button>
+                            <button 
+                                onClick=${handleEmailSummary}
+                                disabled=${isEmailing || emailSent}
+                                className=${`px-8 py-4 rounded-2xl font-black flex items-center gap-3 transition-all active:scale-95 border ${emailSent ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white border-red-400/30 hover:bg-red-500'}`}
+                            >
+                                <${MailIcon} size=${20} /> ${emailSent ? 'Summary Sent!' : isEmailing ? 'Preparing...' : 'Email Summary'}
+                            </button>
+                            <button 
+                                onClick=${onReset}
+                                className="bg-transparent text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-white/10 transition-all active:scale-95 border border-white/20"
+                            >
+                                <${RefreshIcon} size=${20} /> New Audit
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="no-print pt-20">
+                        <div className="text-center mb-12">
+                            <h2 className="text-4xl font-black text-gray-900 mb-4">Dominate Local Search</h2>
+                            <p className="text-gray-500 max-w-2xl mx-auto text-lg leading-relaxed">
+                                Our SEO specialists help businesses scale across the map. Unlock your full potential with these expert services.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <${ServiceCard} 
+                                title="Authority Engine"
+                                description="High-tier backlink acquisition strategies focused on Domain Authority (DA) and Page Authority (PA) growth."
+                                price=${299}
+                                iconType=${RocketIcon}
+                            />
+                            <${ServiceCard} 
+                                title="Local 3-Pack Push"
+                                description="Aggressive citation building and map signal optimization to secure your place in the top local results."
+                                price=${149}
+                                iconType=${TargetIcon}
+                            />
+                            <${ServiceCard} 
+                                title="Moz Metrics Audit"
+                                description="In-depth analysis of Moz Trust and Spam scores with a direct plan to improve your organic footprint."
+                                price=${199}
+                                iconType=${BarChartIcon}
+                            />
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const BusinessInputForm = ({ onSubmit, isLoading }) => {
+            const [formData, setFormData] = useState({
+                businessName: '',
+                location: '',
+                website: '',
+                email: '',
+                phoneNumber: ''
+            });
+
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(formData);
+            };
+
+            return html`
+                <div className="glass-card p-10 md:p-14">
+                    <div className="space-y-2 mb-10">
+                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Audit Request</h2>
+                        <p className="text-gray-500">Provide your basic profile details for a comprehensive metric scan.</p>
+                    </div>
+
+                    <form onSubmit=${handleSubmit} className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-sm font-black text-gray-600 uppercase tracking-widest">
+                                    <${MailIcon} size=${16} className="text-red-600" /> Professional Email
+                                </label>
+                                <input 
+                                    required
+                                    type="email" 
+                                    name="email"
+                                    value=${formData.email}
+                                    onChange=${handleChange}
+                                    placeholder="your@email.com"
+                                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-100 focus:border-red-600 transition-all outline-none text-lg"
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-sm font-black text-gray-600 uppercase tracking-widest">
+                                    <${PhoneIcon} size=${16} className="text-red-600" /> Callback Phone
+                                </label>
+                                <input 
+                                    required
+                                    type="tel" 
+                                    name="phoneNumber"
+                                    value=${formData.phoneNumber}
+                                    onChange=${handleChange}
+                                    placeholder="(555) 000-0000"
+                                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-100 focus:border-red-600 transition-all outline-none text-lg"
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-sm font-black text-gray-600 uppercase tracking-widest">
+                                    <${BuildingIcon} size=${16} className="text-red-600" /> Business Name
+                                </label>
+                                <input 
+                                    required
+                                    type="text" 
+                                    name="businessName"
+                                    value=${formData.businessName}
+                                    onChange=${handleChange}
+                                    placeholder="e.g. Skyline Digital"
+                                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-100 focus:border-red-600 transition-all outline-none text-lg"
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-sm font-black text-gray-600 uppercase tracking-widest">
+                                    <${MapPinIcon} size=${16} className="text-red-600" /> Market Location
+                                </label>
+                                <input 
+                                    required
+                                    type="text" 
+                                    name="location"
+                                    value=${formData.location}
+                                    onChange=${handleChange}
+                                    placeholder="City, State"
+                                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-100 focus:border-red-600 transition-all outline-none text-lg"
+                                />
+                            </div>
+                            <div className="space-y-3 md:col-span-2">
+                                <label className="flex items-center gap-2 text-sm font-black text-gray-600 uppercase tracking-widest">
+                                    <${ExternalLinkIcon} size=${16} className="text-red-600" /> Website URL (Optional)
+                                </label>
+                                <input 
+                                    type="url" 
+                                    name="website"
+                                    value=${formData.website}
+                                    onChange=${handleChange}
+                                    placeholder="https://yourbusiness.com"
+                                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-red-100 focus:border-red-600 transition-all outline-none text-lg"
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            disabled=${isLoading}
+                            className="w-full py-5 bg-red-600 hover:bg-red-700 text-white rounded-3xl font-black text-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 group"
+                        >
+                            ${isLoading ? 'Analyzing Signals...' : html`
+                                Generate Expert Audit <${RocketIcon} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                            `}
+                        </button>
+                    </form>
+                </div>
+            `;
+        };
+
+        const AdminPanel = ({ history, onClear, onClose, onViewAudit }) => html`
+            <div className="glass-card p-10 animate-fade-in max-w-6xl mx-auto w-full">
+                <div className="flex justify-between items-center mb-10 border-b border-gray-100 pb-6">
+                    <div>
+                        <h2 className="text-3xl font-black text-gray-900">Audit Vault</h2>
+                        <p className="text-gray-500">History of all profile scans generated through this instance.</p>
+                    </div>
+                    <button onClick=${onClose} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors">
+                        <${XIcon} size=${28} />
+                    </button>
+                </div>
+
+                ${history.length === 0 ? html`
+                    <div className="py-20 text-center space-y-4">
+                        <div className="inline-block p-6 bg-gray-50 rounded-[40px] text-gray-300">
+                             <${SearchIcon} size=${64} />
+                        </div>
+                        <p className="text-gray-400 font-bold text-xl">No scan history found.</p>
+                    </div>
+                ` : html`
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Company</th>
+                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Score</th>
+                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Contact</th>
+                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Market</th>
+                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest whitespace-nowrap">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                ${history.map((entry, idx) => html`
+                                    <tr key=${idx} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-6 py-6 font-bold text-gray-900">
+                                            <div className="flex flex-col">
+                                                <span>${entry.businessName}</span>
+                                                <span className="text-xs text-indigo-500 font-medium">${entry.website || 'No Website'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6 font-black">
+                                            <span className=${`px-3 py-1 rounded-full text-sm ${entry.overallScore < 40 ? 'bg-red-50 text-red-600' : entry.overallScore < 75 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                ${entry.overallScore}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-6 text-gray-600">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold whitespace-nowrap">${entry.email}</span>
+                                                <span className="text-xs">${entry.phoneNumber}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6 text-gray-500">${entry.location}</td>
+                                        <td className="px-6 py-6">
+                                            <button 
+                                                onClick=${() => onViewAudit(entry)}
+                                                className="text-red-600 font-black hover:underline whitespace-nowrap flex items-center gap-1"
+                                            >
+                                                View <${ExternalLinkIcon} size=${14} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `)}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="mt-12 flex justify-end">
+                        <button 
+                            onClick=${onClear}
+                            className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black hover:bg-red-100 transition-colors flex items-center gap-2"
+                        >
+                            <${TrashIcon} size=${18} /> Purge Vault
+                        </button>
+                    </div>
+                `}
+            </div>
+        `;
+
+        // --- MAIN APP ---
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [isInitialLoading, setIsInitialLoading] = useState(true);
+            const [result, setResult] = useState(null);
+            const [selectedLead, setSelectedLead] = useState(null);
+            const [error, setError] = useState(null);
+            const [activeBusiness, setActiveBusiness] = useState('');
+            const [history, setHistory] = useState([]);
+            const [showAdmin, setShowAdmin] = useState(false);
+
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setIsInitialLoading(false);
+                });
+                return unsubscribe;
+            }, []);
+
+            const login = async () => {
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (err) {
+                    console.error("Login failed", err);
+                }
+            };
+
+            const logout = () => signOut(auth);
+
+            const adminEmail = "customerservice.mme365@gmail.com"; // Set the authorized admin email
+
+            useEffect(() => {
+                if (!user) return;
+                
+                const fetchHistory = async () => {
+                    try {
+                        let q;
+                        if (user.email === adminEmail) {
+                            // Admin sees all leads
+                            q = query(
+                                collection(db, "leads"), 
+                                orderBy("timestamp", "desc")
+                            );
+                        } else {
+                            // Regular users see only their own
+                            q = query(
+                                collection(db, "leads"), 
+                                where("userId", "==", user.uid),
+                                orderBy("timestamp", "desc")
+                            );
+                        }
+                        const snapshot = await getDocs(q);
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setHistory(data);
+                    } catch (err) {
+                        console.error("Failed to fetch history:", err);
+                    }
+                };
+                fetchHistory();
+            }, [user]);
+
+            const runAudit = async (data) => {
+                if (!user) return;
+                setIsLoading(true);
+                setError(null);
+                setResult(null);
+                setActiveBusiness(data.businessName);
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/audit`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            businessName: data.businessName,
+                            location: data.location,
+                            phoneNumber: data.phoneNumber
+                        })
+                    });
+
+                    if (!response.ok) throw new Error("Audit generation failed");
+                    const auditResult = await response.json();
+
+                    // Save lead to Firestore
+                    const leadData = {
+                        ...data,
+                        userId: user.uid,
+                        overallScore: auditResult.overallScore,
+                        auditBreakdown: auditResult.auditBreakdown,
+                        recommendations: auditResult.recommendations,
+                        timestamp: new Date().toISOString(),
+                        serverTimestamp: serverTimestamp()
+                    };
+                    
+                    await addDoc(collection(db, "leads"), leadData);
+
+                    setResult(auditResult);
+                    
+                    // Refresh history locally
+                    setHistory(prev => [leadData, ...prev]);
+
+                } catch (err) {
+                    console.error("Audit failed:", err);
+                    setError("Failed to process audit. Check console.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const viewAudit = (lead) => {
+                if (lead.auditBreakdown && lead.recommendations) {
+                    setResult({
+                        overallScore: lead.overallScore,
+                        auditBreakdown: lead.auditBreakdown,
+                        recommendations: lead.recommendations
+                    });
+                    setActiveBusiness(lead.businessName);
+                    setShowAdmin(false);
+                } else {
+                    // Fallback for older leads or if generation is needed
+                    setResult({
+                        overallScore: lead.overallScore,
+                        auditBreakdown: [
+                            { category: 'Historical Data', score: lead.overallScore, comment: 'This is an archived lead. Precision breakdown available in modern scans only.' }
+                        ],
+                        recommendations: [
+                            { title: 'Data Migration', description: 'Contact your technical lead to migrate legacy reports to the new persistent format.' }
+                        ]
+                    });
+                    setActiveBusiness(lead.businessName);
+                    setShowAdmin(false);
+                }
+            };
+
+            const clearHistory = async () => {
+                if (user?.email !== adminEmail) {
+                    alert("Unauthorized access restricted.");
+                    return;
+                }
+                
+                if (!confirm("Are you sure you want to permanently delete all leads? This action cannot be undone.")) return;
+                
+                setIsLoading(true);
+                try {
+                    const snapshot = await getDocs(collection(db, "leads"));
+                    const batch = snapshot.docs.map(d => deleteDoc(doc(db, "leads", d.id)));
+                    await Promise.all(batch);
+                    setHistory([]);
+                    alert("Vault purged successfully.");
+                } catch (err) {
+                    console.error("Purge failed:", err);
+                    alert("Failed to purge vault. Check permissions.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            if (isInitialLoading) return html`<${Loader} />`;
+
+            return html`
+                <div className="min-h-screen p-4 sm:p-8 md:p-12 relative overflow-hidden">
+                    <div className="max-w-6xl mx-auto space-y-12 relative z-10">
+                        
+                        <header className="no-print flex justify-between items-start">
+                            <div className="space-y-1">
+                                <h1 className="text-4xl font-black text-gray-900 tracking-tighter">GBP Auditor <span className="text-red-600">Pro</span></h1>
+                                <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-xs">AI-Driven Local SEO Intelligence</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                ${user && html`
+                                    <div className="hidden md:flex flex-col items-end mr-2">
+                                        <span className="text-sm font-black text-gray-900">${user.displayName}</span>
+                                        <button onClick=${logout} className="text-[10px] font-black text-red-600 uppercase tracking-widest hover:text-red-500">Sign Out</button>
+                                    </div>
+                                `}
+                                <button 
+                                    onClick=${() => setShowAdmin(!showAdmin)}
+                                    className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-400 hover:text-red-600 transition-colors"
+                                >
+                                    <${SettingsIcon} size=${24} />
+                                </button>
+                            </div>
+                        </header>
+
+                        <main>
+                            ${!user ? html`
+                                <${LoginView} onLogin=${login} />
+                            ` : showAdmin ? html`
+                                <${AdminPanel} history=${history} onClear=${clearHistory} onClose=${() => setShowAdmin(false)} onViewAudit=${viewAudit} />
+                            ` : isLoading ? html`
+                                <${Loader} />
+                            ` : result ? html`
+                                <${AuditResultView} result=${result} businessName=${activeBusiness} onReset=${() => setResult(null)} />
+                            ` : html`
+                                <div className="space-y-20">
+                                    <div className="text-center space-y-6 pt-10">
+                                        <h2 className="text-5xl md:text-7xl font-black text-gray-900 leading-none tracking-tight">Are you losing <br/><span className="text-red-600">Local Customers?</span></h2>
+                                        <p className="text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
+                                            Most Google Business Profiles are only 40% optimized. Get an instant multi-signal audit to discover how to dominate your local market.
+                                        </p>
+                                    </div>
+                                    <${BusinessInputForm} onSubmit=${runAudit} isLoading=${isLoading} />
+                                </div>
+                            `}
+                        </main>
+
+                        <footer className="no-print pt-20 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 text-gray-400 font-bold text-sm">
+                            <div className="flex items-center gap-2">
+                                &copy; ${new Date().getFullYear()} SEO Services Inc. <span className="text-gray-200">|</span> Precision Intelligence
+                            </div>
+                            <div className="flex gap-8">
+                                <a href="javascript:void(0)" className="hover:text-gray-900 transition-colors">Privacy</a>
+                                <a href="javascript:void(0)" className="hover:text-gray-900 transition-colors">Terms</a>
+                                <a href="javascript:void(0)" className="hover:text-gray-900 transition-colors">Contact</a>
+                            </div>
+                        </footer>
+                    </div>
+
+                    <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-0">
+                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-red-50 rounded-full blur-[120px] opacity-60"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-50 rounded-full blur-[120px] opacity-60"></div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(html`<${App} />`);
+    })();
+    </script>
+</body>
 </html>
