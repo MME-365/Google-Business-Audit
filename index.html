@@ -57,6 +57,8 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/lucide-react@latest"></script>
+    <!-- jsPDF for vector PDF Generation, Preview, and Instant Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -181,6 +183,8 @@
         const EyeIcon = getIcon('Eye');
         const ClockIcon = getIcon('Clock');
         const ArrowRightIcon = getIcon('ArrowRight');
+        const FileTextIcon = getIcon('FileText');
+        const PrinterIcon = getIcon('Printer');
         const GoogleIcon = (props) => html`
             <svg ...props viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -659,16 +663,478 @@
             `;
         };
 
-        const AuditResultView = ({ result, businessName, onReset, isAdmin, isSubscriber, isUnlocked, onUnlockRequest }) => {
-            const handlePrint = () => {
-                if (isAdmin || isSubscriber || isUnlocked) {
-                    window.print();
-                } else {
-                    onUnlockRequest('download');
+        // --- VECTOR PDF GENERATION ENGINE ---
+        const generateAuditPDF = ({ result, businessName, businessDetails }) => {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                console.warn("jsPDF is not loaded yet");
+                return null;
+            }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'pt',
+                format: 'a4'
+            });
+
+            const pageWidth = 595.28;
+            const pageHeight = 841.89;
+            const margin = 40;
+            const contentWidth = pageWidth - margin * 2; // 515.28 pt
+
+            const business = businessName || 'Google Business Profile';
+            const location = businessDetails?.location || 'Local Market Area';
+            const phone = businessDetails?.phoneNumber || 'Not Listed';
+            const score = result?.overallScore || 0;
+            const dateStr = new Date().toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+
+            const getScoreColor = (s) => {
+                if (s < 45) return [239, 68, 68]; // #ef4444 Red
+                if (s < 75) return [245, 158, 11]; // #f59e0b Amber
+                return [16, 185, 129]; // #10b981 Emerald
+            };
+
+            const scoreColor = getScoreColor(score);
+
+            // ================= PAGE 1: EXECUTIVE AUDIT REPORT =================
+            // 1. Top Header Banner
+            doc.setFillColor(17, 24, 39); // #111827 Dark Navy
+            doc.rect(0, 0, pageWidth, 72, 'F');
+
+            // Red accent underline
+            doc.setFillColor(220, 38, 38); // #dc2626
+            doc.rect(0, 70, pageWidth, 2.5, 'F');
+
+            // Header Titles
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text("GBP AUDITOR PRO", margin, 32);
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8.5);
+            doc.setTextColor(248, 113, 113); // #f87171
+            doc.text("GOOGLE BUSINESS PROFILE AUDIT & REVENUE REPORT", margin, 46);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.setTextColor(156, 163, 175); // #9ca3af
+            doc.text(`DATE: ${dateStr.toUpperCase()}`, pageWidth - margin, 32, { align: 'right' });
+            doc.text("CONFIDENTIAL ANALYSIS • FOR BUSINESS OWNER", pageWidth - margin, 46, { align: 'right' });
+
+            // 2. Business Profile Details Box
+            let currentY = 90;
+            doc.setFillColor(249, 250, 251); // #f9fafb
+            doc.setDrawColor(229, 231, 235); // #e5e7eb
+            doc.setLineWidth(1);
+            doc.roundedRect(margin, currentY, contentWidth, 52, 6, 6, 'FD');
+
+            doc.setTextColor(17, 24, 39);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text(business, margin + 14, currentY + 22);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.setTextColor(107, 114, 128); // #6b7280
+            const metaLine = `Location: ${location}   |   Phone: ${phone}   |   Engine: Google 3-Pack AI Intelligence`;
+            doc.text(metaLine, margin + 14, currentY + 38);
+
+            // 3. Score & Assessment Box
+            currentY += 64;
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(229, 231, 235);
+            doc.roundedRect(margin, currentY, contentWidth, 76, 6, 6, 'FD');
+
+            // Score Badge
+            doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+            doc.roundedRect(margin + 12, currentY + 12, 76, 52, 6, 6, 'F');
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(24);
+            doc.text(`${score}`, margin + 50, currentY + 42, { align: 'center' });
+
+            doc.setFontSize(7.5);
+            doc.text("/ 100 HEALTH", margin + 50, currentY + 54, { align: 'center' });
+
+            // Status description beside score
+            doc.setTextColor(17, 24, 39);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10.5);
+            const scoreTitle = score >= 75 
+                ? "OPTIMIZED LOCAL VISIBILITY STATUS" 
+                : score >= 45 
+                ? "MODERATE VISIBILITY (LEAKING HIGH-INTENT CALLS)" 
+                : "CRITICAL LOCAL DEFICIT (PAGE 2 MAP OBSCURITY)";
+            doc.text(scoreTitle, margin + 100, currentY + 26);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(75, 85, 99);
+            const scoreBlurb = score >= 75
+                ? "This profile demonstrates solid ranking authority. Consistent citation updates and review acquisition will safeguard and grow your top 3-Pack map placements against aggressive competitors."
+                : score >= 45
+                ? "Noticeable optimization gaps detected. Over 50% of potential phone calls, map directions, and customer clicks are currently captured by higher-ranked local competitors in your radius."
+                : "Severe ranking factors are missing or unoptimized. Approximately 84% of ready-to-buy local searchers will never discover this profile due to bottom-tier Google ranking signals.";
+            const splitScoreBlurb = doc.splitTextToSize(scoreBlurb, contentWidth - 110);
+            doc.text(splitScoreBlurb, margin + 100, currentY + 40);
+
+            // 4. Metric Breakdown Header
+            currentY += 88;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10.5);
+            doc.setTextColor(17, 24, 39);
+            doc.text("CORE SIGNAL BREAKDOWN (6 LOCAL RANKING PILLARS)", margin, currentY);
+
+            doc.setDrawColor(229, 231, 235);
+            doc.setLineWidth(0.75);
+            doc.line(margin, currentY + 5, margin + contentWidth, currentY + 5);
+
+            currentY += 14;
+
+            // Render 6 Breakdown Items
+            const breakdown = result?.auditBreakdown || [];
+            breakdown.forEach((item, index) => {
+                const itemScore = item.score || 0;
+                const barColor = getScoreColor(itemScore);
+
+                // Container background
+                doc.setFillColor(252, 252, 253);
+                doc.setDrawColor(243, 244, 246);
+                doc.roundedRect(margin, currentY, contentWidth, 54, 4, 4, 'FD');
+
+                // Title and Score
+                doc.setTextColor(17, 24, 39);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.text(item.category || `Signal Pillar ${index + 1}`, margin + 10, currentY + 14);
+
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(barColor[0], barColor[1], barColor[2]);
+                doc.text(`${itemScore}%`, margin + contentWidth - 10, currentY + 14, { align: 'right' });
+
+                // Score Track Bar
+                const barWidth = contentWidth - 20;
+                doc.setFillColor(229, 231, 235);
+                doc.roundedRect(margin + 10, currentY + 18, barWidth, 4, 2, 2, 'F');
+
+                // Fill Bar
+                doc.setFillColor(barColor[0], barColor[1], barColor[2]);
+                const filledWidth = Math.max(6, (itemScore / 100) * barWidth);
+                doc.roundedRect(margin + 10, currentY + 18, filledWidth, 4, 2, 2, 'F');
+
+                // Commentary text
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(7.5);
+                doc.setTextColor(107, 114, 128);
+                const comment = item.comment || "Optimization recommended for this category.";
+                const splitComment = doc.splitTextToSize(comment, barWidth);
+                doc.text(splitComment, margin + 10, currentY + 31);
+
+                currentY += 60;
+            });
+
+            // Page 1 Footer
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(156, 163, 175);
+            doc.setDrawColor(229, 231, 235);
+            doc.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
+            doc.text("GBP Auditor Pro • Proprietary Local Search Signal Intelligence", margin, pageHeight - 18);
+            doc.text("Page 1 of 2", pageWidth - margin, pageHeight - 18, { align: 'right' });
+
+
+            // ================= PAGE 2: ROADMAP & ACTION PLAN =================
+            doc.addPage();
+
+            // Page 2 Header Banner
+            doc.setFillColor(17, 24, 39);
+            doc.rect(0, 0, pageWidth, 52, 'F');
+            doc.setFillColor(220, 38, 38);
+            doc.rect(0, 50, pageWidth, 2, 'F');
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.text("STRATEGIC ROADMAP & ACTIONABLE RECOMMENDATIONS", margin, 26);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(209, 213, 219);
+            doc.text(`Action Plan Prepared For: ${business}`, margin, 40);
+
+            let p2Y = 68;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10.5);
+            doc.setTextColor(17, 24, 39);
+            doc.text("PRIORITY EXECUTION BLUEPRINT", margin, p2Y);
+
+            doc.setDrawColor(229, 231, 235);
+            doc.setLineWidth(0.75);
+            doc.line(margin, p2Y + 5, margin + contentWidth, p2Y + 5);
+
+            p2Y += 16;
+
+            // Render Recommendations
+            const recs = result?.recommendations || [];
+            recs.forEach((rec, idx) => {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                const splitDesc = doc.splitTextToSize(rec.description || '', contentWidth - 40);
+                const boxHeight = 36 + splitDesc.length * 10;
+
+                // Container
+                doc.setFillColor(255, 255, 255);
+                doc.setDrawColor(229, 231, 235);
+                doc.setLineWidth(1);
+                doc.roundedRect(margin, p2Y, contentWidth, boxHeight, 5, 5, 'FD');
+
+                // Priority left accent stripe
+                doc.setFillColor(idx === 0 ? 220 : 16, idx === 0 ? 38 : 185, idx === 0 ? 38 : 129);
+                doc.roundedRect(margin, p2Y, 5, boxHeight, 2, 2, 'F');
+
+                // Step Badge
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.5);
+                doc.setTextColor(156, 163, 175);
+                doc.text(`STEP 0${idx + 1} • PRIORITY ACTION`, margin + 14, p2Y + 14);
+
+                // Title
+                doc.setTextColor(17, 24, 39);
+                doc.setFontSize(9.5);
+                doc.setFont('helvetica', 'bold');
+                doc.text(rec.title || `Recommendation ${idx + 1}`, margin + 14, p2Y + 26);
+
+                // Description
+                doc.setTextColor(75, 85, 99);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.text(splitDesc, margin + 14, p2Y + 38);
+
+                p2Y += boxHeight + 10;
+            });
+
+            // Market Benchmark Block on Page 2
+            if (p2Y < 640) {
+                p2Y = Math.max(p2Y + 6, 480);
+                doc.setFillColor(249, 250, 251);
+                doc.setDrawColor(229, 231, 235);
+                doc.roundedRect(margin, p2Y, contentWidth, 110, 6, 6, 'FD');
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9.5);
+                doc.setTextColor(17, 24, 39);
+                doc.text("VERIFIED GOOGLE LOCAL SEARCH BENCHMARKS", margin + 14, p2Y + 20);
+
+                const benchmarks = [
+                    { num: "46%", label: "Searches have direct local intent to buy nearby" },
+                    { num: "76%", label: "Mobile searchers visit a business within 24 hours" },
+                    { num: "28%", label: "Local mobile queries lead to an immediate purchase" },
+                    { num: "4.2x", label: "More calls captured by Google Maps 3-Pack listings" }
+                ];
+
+                benchmarks.forEach((b, i) => {
+                    const col = i % 2;
+                    const row = Math.floor(i / 2);
+                    const bx = margin + 14 + col * 245;
+                    const by = p2Y + 42 + row * 34;
+
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(13);
+                    doc.setTextColor(220, 38, 38);
+                    doc.text(b.num, bx, by);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(7.5);
+                    doc.setTextColor(75, 85, 99);
+                    const splitLabel = doc.splitTextToSize(b.label, 180);
+                    doc.text(splitLabel, bx + 36, by - 2);
+                });
+            }
+
+            // Disclaimer / Next Steps box at bottom
+            doc.setFillColor(254, 242, 242); // #fef2f2 red-50
+            doc.setDrawColor(254, 202, 202); // #fecaca red-200
+            doc.roundedRect(margin, pageHeight - 110, contentWidth, 54, 6, 6, 'FD');
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8.5);
+            doc.setTextColor(153, 27, 27); // #991b1b red-800
+            doc.text("NEXT STEPS: LOCAL 3-PACK IMPLEMENTATION", margin + 12, pageHeight - 92);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.5);
+            doc.setTextColor(185, 28, 28);
+            doc.text(
+                "Execute these roadmap recommendations over the next 14-30 days to signal Google algorithms and secure your top 3-Pack placement. For managed execution, review our professional SEO packages.",
+                margin + 12, 
+                pageHeight - 80,
+                { maxWidth: contentWidth - 24 }
+            );
+
+            // Page 2 Footer
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(156, 163, 175);
+            doc.setDrawColor(229, 231, 235);
+            doc.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
+            doc.text(`Google Business Profile Audit Report • Generated for ${business}`, margin, pageHeight - 18);
+            doc.text("Page 2 of 2", pageWidth - margin, pageHeight - 18, { align: 'right' });
+
+            const safeName = business.replace(/[^a-zA-Z0-9]/g, '_');
+            const defaultFilename = `GBP-Audit-${safeName}.pdf`;
+
+            const blob = doc.output('blob');
+            const blobUrl = URL.createObjectURL(blob);
+            const dataUri = doc.output('datauristring');
+
+            const downloadPdf = () => {
+                try {
+                    doc.save(defaultFilename);
+                } catch (e) {
+                    console.warn("doc.save fallback:", e);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = defaultFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
                 }
             };
+
+            return {
+                doc,
+                blob,
+                blobUrl,
+                dataUri,
+                filename: defaultFilename,
+                download: downloadPdf
+            };
+        };
+
+        // --- PDF PREVIEW MODAL ---
+        const PdfPreviewModal = ({ isOpen, onClose, pdfData, onDownload }) => {
+            if (!isOpen || !pdfData) return null;
+            return html`
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-4xl w-full h-[90vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden relative">
+                        <!-- Top Toolbar -->
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-100 text-red-600 rounded-xl">
+                                    <${FileTextIcon} size=${20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-gray-900 truncate max-w-[200px] sm:max-w-md">${pdfData.filename}</h3>
+                                    <p className="text-[11px] font-bold text-gray-500">2 Pages • High-Resolution Vector PDF Report</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick=${onDownload}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                                >
+                                    <${DownloadIcon} size=${15} /> Download PDF
+                                </button>
+                                <button
+                                    onClick=${onClose}
+                                    className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                                >
+                                    <${XIcon} size=${20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Embedded PDF View -->
+                        <div className="flex-1 bg-gray-200 p-2 sm:p-4 overflow-hidden relative">
+                            <iframe 
+                                src=${pdfData.blobUrl} 
+                                className="w-full h-full rounded-2xl shadow-inner border border-gray-300 bg-white"
+                                title="Audit PDF Preview"
+                            />
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const AuditResultView = ({ result, businessName, businessDetails, onReset, isAdmin, isSubscriber, isUnlocked, onUnlockRequest }) => {
+            const [pdfData, setPdfData] = useState(null);
+            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+            const [showPdfPreview, setShowPdfPreview] = useState(false);
+            const [downloadSuccess, setDownloadSuccess] = useState(false);
             const [isEmailing, setIsEmailing] = useState(false);
             const [emailSent, setEmailSent] = useState(false);
+
+            // Automatically compile the vector PDF from the audited data without triggering an immediate download
+            useEffect(() => {
+                if (!result) return;
+                setIsGeneratingPdf(true);
+                try {
+                    const timer = setTimeout(() => {
+                        const generated = generateAuditPDF({ result, businessName, businessDetails });
+                        if (generated) {
+                            setPdfData(generated);
+                        }
+                        setIsGeneratingPdf(false);
+                    }, 60);
+                    return () => clearTimeout(timer);
+                } catch (err) {
+                    console.error("PDF generation failed:", err);
+                    setIsGeneratingPdf(false);
+                }
+            }, [result, businessName, businessDetails]);
+
+            const isAccessGranted = isAdmin || isSubscriber || isUnlocked;
+
+            const handleDownloadPdf = () => {
+                if (!isAccessGranted) {
+                    onUnlockRequest('download');
+                    return;
+                }
+
+                try {
+                    if (pdfData && pdfData.download) {
+                        pdfData.download();
+                    } else {
+                        const generated = generateAuditPDF({ result, businessName, businessDetails });
+                        if (generated) {
+                            setPdfData(generated);
+                            generated.download();
+                        }
+                    }
+                    setDownloadSuccess(true);
+                    setTimeout(() => setDownloadSuccess(false), 4000);
+                } catch (e) {
+                    console.error("Failed to download PDF:", e);
+                }
+            };
+
+            const handlePreviewPdf = () => {
+                if (!isAccessGranted) {
+                    onUnlockRequest('preview');
+                    return;
+                }
+
+                if (!pdfData) {
+                    const generated = generateAuditPDF({ result, businessName, businessDetails });
+                    if (generated) setPdfData(generated);
+                }
+                setShowPdfPreview(true);
+            };
+
+            const handlePrint = () => {
+                if (!isAccessGranted) {
+                    onUnlockRequest('download');
+                    return;
+                }
+                window.print();
+            };
 
             const handleEmailSummary = async () => {
                 if (!isAdmin && !isSubscriber && !isUnlocked) {
@@ -690,8 +1156,6 @@
                 }
             };
 
-            const isAccessGranted = isAdmin || isSubscriber || isUnlocked;
-
             return html`
                 <div className="fade-in space-y-12">
                     <div className="text-center space-y-4">
@@ -701,6 +1165,39 @@
 
                     <div className="flex justify-center py-6">
                         <${ScoreCircle} score=${result.overallScore} />
+                    </div>
+
+                    <!-- PDF Ready Showcase Card -->
+                    <div className="no-print p-6 bg-gradient-to-r from-gray-900 via-gray-900 to-black text-white rounded-3xl border border-gray-800 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 flex-shrink-0">
+                                <${FileTextIcon} size=${28} />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                        ${isGeneratingPdf ? 'Compiling PDF...' : 'PDF Report Ready'}
+                                    </span>
+                                    <span className="text-xs text-gray-400 font-bold">• 2 Pages (A4)</span>
+                                </div>
+                                <h4 className="text-base font-black text-white">Executive Local SEO Audit Report (${businessName})</h4>
+                                <p className="text-xs text-gray-400">Complete vector PDF compiled from audited data: score gauge, 6 ranking pillars, tactical roadmap, and Google benchmarks.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 w-full sm:w-auto flex-shrink-0">
+                            <button
+                                onClick=${handlePreviewPdf}
+                                className="flex-1 sm:flex-none px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-95"
+                            >
+                                <${EyeIcon} size=${16} /> Preview PDF
+                            </button>
+                            <button
+                                onClick=${handleDownloadPdf}
+                                className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 transition-all active:scale-95"
+                            >
+                                <${DownloadIcon} size=${16} /> ${isAccessGranted ? 'Download PDF' : 'Download PDF ($2.00)'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -757,21 +1254,27 @@
                             </div>
                             <h2 className="text-4xl font-black mb-4">Protect Your Rankings</h2>
                             <p className="text-red-200 max-w-xl mx-auto text-lg">
-                                Download this expert report, email a summary to your team, or start a fresh audit.
+                                Download this high-resolution PDF report, preview the document, email an executive summary, or start a fresh audit.
                             </p>
                         </div>
                         
-                        <div className="flex flex-wrap justify-center gap-5 relative">
+                        <div className="flex flex-wrap justify-center gap-4 relative">
                             <button 
-                                onClick=${handlePrint}
+                                onClick=${handleDownloadPdf}
                                 className="bg-white text-red-950 px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-red-50 transition-all active:scale-95 shadow-lg"
                             >
-                                <${DownloadIcon} size=${20} /> ${isAccessGranted ? 'Save as PDF' : 'Save as PDF ($2.00)'}
+                                <${DownloadIcon} size=${20} /> ${downloadSuccess ? 'Downloaded!' : isAccessGranted ? 'Download PDF Report' : 'Download PDF ($2.00)'}
+                            </button>
+                            <button 
+                                onClick=${handlePreviewPdf}
+                                className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-7 py-4 rounded-2xl font-black flex items-center gap-2 transition-all active:scale-95 shadow-lg"
+                            >
+                                <${EyeIcon} size=${20} /> Preview PDF
                             </button>
                             <button 
                                 onClick=${handleEmailSummary}
                                 disabled=${isEmailing || emailSent}
-                                className=${`px-8 py-4 rounded-2xl font-black flex items-center gap-3 transition-all active:scale-95 border shadow-lg ${emailSent ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white border-red-400/30 hover:bg-red-500'}`}
+                                className=${`px-7 py-4 rounded-2xl font-black flex items-center gap-3 transition-all active:scale-95 border shadow-lg ${emailSent ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white border-red-400/30 hover:bg-red-500'}`}
                             >
                                 <${MailIcon} size=${20} /> ${emailSent ? 'Summary Sent!' : isEmailing ? 'Preparing...' : isAccessGranted ? 'Email Summary' : 'Email Summary ($2.00)'}
                             </button>
@@ -784,13 +1287,28 @@
                                 </button>
                             `}
                             <button 
+                                onClick=${handlePrint}
+                                title="Browser Print Dialog"
+                                className="bg-white/5 hover:bg-white/10 text-white/70 hover:text-white px-5 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all border border-white/10"
+                            >
+                                <${PrinterIcon} size=${18} />
+                            </button>
+                            <button 
                                 onClick=${onReset}
-                                className="bg-transparent text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-white/10 transition-all active:scale-95 border border-white/20"
+                                className="bg-transparent text-white px-7 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-white/10 transition-all active:scale-95 border border-white/20"
                             >
                                 <${RefreshIcon} size=${20} /> New Audit
                             </button>
                         </div>
                     </div>
+
+                    <!-- PDF Preview Modal -->
+                    <${PdfPreviewModal}
+                        isOpen=${showPdfPreview}
+                        onClose=${() => setShowPdfPreview(false)}
+                        pdfData=${pdfData}
+                        onDownload=${handleDownloadPdf}
+                    />
 
                     <div className="no-print pt-20">
                         <div className="text-center mb-12">
@@ -1202,6 +1720,7 @@
             const [result, setResult] = useState(null);
             const [error, setError] = useState(null);
             const [activeBusiness, setActiveBusiness] = useState('');
+            const [activeBusinessDetails, setActiveBusinessDetails] = useState(null);
             const [history, setHistory] = useState([]);
             const [showAdmin, setShowAdmin] = useState(false);
 
@@ -1352,6 +1871,7 @@
                 setError(null);
                 setResult(null);
                 setActiveBusiness(data.businessName);
+                setActiveBusinessDetails(data);
 
                 try {
                     const response = await fetch(`${API_BASE}/api/audit`, {
@@ -1404,6 +1924,7 @@
                         recommendations: lead.recommendations
                     });
                     setActiveBusiness(lead.businessName);
+                    setActiveBusinessDetails(lead);
                     setShowAdmin(false);
                 } else {
                     setResult({
@@ -1416,6 +1937,7 @@
                         ]
                     });
                     setActiveBusiness(lead.businessName);
+                    setActiveBusinessDetails(lead);
                     setShowAdmin(false);
                 }
             };
@@ -1519,7 +2041,8 @@
                                 <${AuditResultView} 
                                     result=${result} 
                                     businessName=${activeBusiness} 
-                                    onReset=${() => setResult(null)}
+                                    businessDetails=${activeBusinessDetails}
+                                    onReset=${() => { setResult(null); setActiveBusinessDetails(null); }}
                                     isAdmin=${isAdmin}
                                     isSubscriber=${isSubscriber}
                                     isUnlocked=${unlockedAudits.includes(activeBusiness)}
