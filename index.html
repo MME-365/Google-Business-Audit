@@ -1516,7 +1516,7 @@
             `;
         };
 
-        const AdminPanel = ({ history, onClear, onClose, onViewAudit, adminEmail, paypalSubUrl, paypalDocUrl, onSavePaypalUrls }) => {
+        const AdminPanel = ({ history, onClear, onClose, onViewAudit, adminEmail, paypalSubUrl, paypalDocUrl, onSavePaypalUrls, onLogout }) => {
             const [subUrlInput, setSubUrlInput] = useState(paypalSubUrl || '');
             const [docUrlInput, setDocUrlInput] = useState(paypalDocUrl || '');
             const [isSaved, setIsSaved] = useState(false);
@@ -1544,12 +1544,23 @@
                             <h2 className="text-3xl font-black text-gray-900">Audit Vault & Management</h2>
                             <p className="text-gray-500 text-sm">Restricted to marketingmanagementenp.365@gmail.com & customerservice.mme365@gmail.com</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="hidden sm:inline-block text-xs font-bold text-gray-500 bg-gray-100 px-3 py-2 rounded-xl">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="hidden sm:inline-block text-xs font-bold text-gray-600 bg-gray-100 px-3.5 py-2.5 rounded-xl border border-gray-200">
                                 ${adminEmail}
                             </span>
-                            <button onClick=${onClose} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors">
-                                <${XIcon} size=${28} />
+                            <button 
+                                onClick=${onLogout}
+                                title="Sign out of Admin Account"
+                                className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                                <${LogOutIcon} size=${16} /> Sign Out
+                            </button>
+                            <button 
+                                onClick=${onClose} 
+                                title="Close Admin Vault"
+                                className="p-2.5 hover:bg-gray-100 rounded-2xl transition-colors text-gray-500 hover:text-gray-800"
+                            >
+                                <${XIcon} size=${24} />
                             </button>
                         </div>
                     </div>
@@ -1638,6 +1649,14 @@
                                 <${SearchIcon} size=${64} />
                             </div>
                             <p className="text-gray-400 font-bold text-xl">No scan history found.</p>
+                            <div className="pt-2">
+                                <button 
+                                    onClick=${onLogout}
+                                    className="px-6 py-3 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700 rounded-2xl text-xs font-black transition-colors inline-flex items-center gap-2 border border-gray-200 shadow-sm"
+                                >
+                                    <${LogOutIcon} size=${16} /> Sign Out of Admin Account
+                                </button>
+                            </div>
                         </div>
                     ` : html`
                         <div className="space-y-4">
@@ -1689,13 +1708,25 @@
                             </div>
                         </div>
 
-                        <div className="flex justify-end pt-4">
-                            <button 
-                                onClick=${onClear}
-                                className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black hover:bg-red-100 transition-colors flex items-center gap-2"
-                            >
-                                <${TrashIcon} size=${18} /> Purge Vault
-                            </button>
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-100">
+                            <div className="text-xs text-gray-400 font-semibold flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                Admin Session: <span className="text-gray-700 font-bold">${adminEmail}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    onClick=${onLogout}
+                                    className="px-5 py-2.5 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700 rounded-2xl text-xs font-black transition-colors flex items-center gap-2 border border-gray-200"
+                                >
+                                    <${LogOutIcon} size=${16} /> Sign Out
+                                </button>
+                                <button 
+                                    onClick=${onClear}
+                                    className="bg-red-50 text-red-600 px-6 py-2.5 rounded-2xl text-xs font-black hover:bg-red-100 transition-colors flex items-center gap-2"
+                                >
+                                    <${TrashIcon} size=${16} /> Purge Vault
+                                </button>
+                            </div>
                         </div>
                     `}
                 </div>
@@ -1998,9 +2029,18 @@
                                         `}
                                     </div>
 
-                                    <div className="hidden md:flex flex-col items-end mr-2">
-                                        <span className="text-sm font-black text-gray-900">${user.displayName || user.email}</span>
-                                        <button onClick=${logout} className="text-[10px] font-black text-red-600 uppercase tracking-widest hover:text-red-500">Sign Out</button>
+                                    <div className="flex items-center gap-1">
+                                        <div className="hidden md:flex flex-col items-end mr-2">
+                                            <span className="text-sm font-black text-gray-900">${user.displayName || user.email}</span>
+                                            <button onClick=${logout} className="text-[10px] font-black text-red-600 uppercase tracking-widest hover:text-red-500">Sign Out</button>
+                                        </div>
+                                        <button 
+                                            onClick=${logout}
+                                            title="Sign Out"
+                                            className="md:hidden p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                                        >
+                                            <${LogOutIcon} size=${18} />
+                                        </button>
                                     </div>
                                 ` : html`
                                     <button 
@@ -2034,6 +2074,7 @@
                                     paypalSubUrl=${paypalSubUrl}
                                     paypalDocUrl=${paypalDocUrl}
                                     onSavePaypalUrls=${handleSavePaypalUrls}
+                                    onLogout=${logout}
                                 />
                             ` : isLoading ? html`
                                 <${Loader} />
