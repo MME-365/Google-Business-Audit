@@ -167,6 +167,20 @@
         const TrashIcon = getIcon('Trash2');
         const SearchIcon = getIcon('Search');
         const LogOutIcon = getIcon('LogOut');
+        const CrownIcon = getIcon('Crown');
+        const LockIcon = getIcon('Lock');
+        const CreditCardIcon = getIcon('CreditCard');
+        const ShieldCheckIcon = getIcon('ShieldCheck');
+        const SparklesIcon = getIcon('Sparkles');
+        const CheckIcon = getIcon('Check');
+        const AlertCircleIcon = getIcon('AlertCircle');
+        const KeyIcon = getIcon('Key');
+        const TrendingUpIcon = getIcon('TrendingUp');
+        const UsersIcon = getIcon('Users');
+        const ShoppingBagIcon = getIcon('ShoppingBag');
+        const EyeIcon = getIcon('Eye');
+        const ClockIcon = getIcon('Clock');
+        const ArrowRightIcon = getIcon('ArrowRight');
         const GoogleIcon = (props) => html`
             <svg ...props viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -175,6 +189,201 @@
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.15l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
         `;
+
+        // --- COMPONENTS ---
+
+        const AnimatedCounter = ({ end, duration = 1500, suffix = '', prefix = '', decimals = 0 }) => {
+            const [val, setVal] = useState(0);
+
+            useEffect(() => {
+                let start = null;
+                let reqId;
+
+                const step = (timestamp) => {
+                    if (!start) start = timestamp;
+                    const progress = Math.min((timestamp - start) / duration, 1);
+                    // Ease out cubic
+                    const ease = 1 - Math.pow(1 - progress, 3);
+                    const current = ease * end;
+                    setVal(current);
+
+                    if (progress < 1) {
+                        reqId = requestAnimationFrame(step);
+                    } else {
+                        setVal(end);
+                    }
+                };
+
+                reqId = requestAnimationFrame(step);
+                return () => cancelAnimationFrame(reqId);
+            }, [end, duration]);
+
+            const displayValue = decimals > 0 ? val.toFixed(decimals) : Math.round(val);
+            return html`<span>${prefix}${displayValue}${suffix}</span>`;
+        };
+
+        const LocalStatsSection = () => {
+            const stats = [
+                {
+                    end: 46,
+                    decimals: 0,
+                    suffix: '%',
+                    prefix: '',
+                    badge: 'Google Local Intent',
+                    title: 'Searches Seek Local Businesses',
+                    description: 'Nearly half of all 8.5 billion daily Google searches have direct local intent to buy from nearby services.',
+                    icon: SearchIcon,
+                    accent: 'text-red-600',
+                    bg: 'bg-red-50/80',
+                    border: 'border-red-100'
+                },
+                {
+                    end: 76,
+                    decimals: 0,
+                    suffix: '%',
+                    prefix: '',
+                    badge: 'Instant Foot Traffic',
+                    title: 'Visit Within 24 Hours',
+                    description: '3 out of 4 consumers searching on smartphones walk into or call a top-ranked local business the same day.',
+                    icon: ClockIcon,
+                    accent: 'text-indigo-600',
+                    bg: 'bg-indigo-50/80',
+                    border: 'border-indigo-100'
+                },
+                {
+                    end: 28,
+                    decimals: 0,
+                    suffix: '%',
+                    prefix: '',
+                    badge: 'Direct Revenue',
+                    title: 'Lead to Immediate Purchases',
+                    description: 'More than 1 in 4 local smartphone queries generate an immediate purchase, making local SEO your highest-ROI channel.',
+                    icon: ShoppingBagIcon,
+                    accent: 'text-emerald-600',
+                    bg: 'bg-emerald-50/80',
+                    border: 'border-emerald-100'
+                },
+                {
+                    end: 4.2,
+                    decimals: 1,
+                    suffix: 'x',
+                    prefix: '',
+                    badge: 'Top 3-Pack Advantage',
+                    title: 'Higher Call & Direction Volume',
+                    description: 'Businesses ranking in the Google Maps 3-Pack capture 83% of total clicks and 4.2x more calls than page 2.',
+                    icon: TrendingUpIcon,
+                    accent: 'text-amber-600',
+                    bg: 'bg-amber-50/80',
+                    border: 'border-amber-100'
+                }
+            ];
+
+            return html`
+                <div className="space-y-8 animate-fade-in">
+                    <!-- Section Header Pill -->
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-black uppercase tracking-wider rounded-full shadow-sm">
+                            <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                            Real Google Local Search Intelligence
+                        </span>
+                        <span className="text-xs font-bold text-gray-500">
+                            Verified Local Search Industry Data
+                        </span>
+                    </div>
+
+                    <!-- 4 Animated Stats Cards -->
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        ${stats.map((stat, i) => html`
+                            <div 
+                                key=${i}
+                                className=${`p-6 bg-white rounded-3xl border ${stat.border} shadow-sm hover:shadow-md transition-all space-y-4 relative overflow-hidden group hover:-translate-y-1`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                        ${stat.badge}
+                                    </span>
+                                    <div className=${`p-2.5 rounded-2xl ${stat.bg} ${stat.accent} transition-transform group-hover:scale-110`}>
+                                        <${stat.icon} size=${20} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className=${`text-5xl font-black tracking-tight ${stat.accent}`}>
+                                        <${AnimatedCounter} 
+                                            end=${stat.end} 
+                                            decimals=${stat.decimals} 
+                                            suffix=${stat.suffix} 
+                                            prefix=${stat.prefix} 
+                                        />
+                                    </div>
+                                    <h4 className="text-sm font-black text-gray-900 leading-snug">
+                                        ${stat.title}
+                                    </h4>
+                                </div>
+
+                                <p className="text-xs text-gray-500 leading-relaxed">
+                                    ${stat.description}
+                                </p>
+                            </div>
+                        `)}
+                    </div>
+
+                    <!-- Visual Comparison Strip -->
+                    <div className="p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-black text-white rounded-3xl border border-gray-800 shadow-xl space-y-6">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-gray-800 pb-6">
+                            <div>
+                                <span className="text-xs font-black uppercase tracking-widest text-red-400 flex items-center gap-1.5">
+                                    <${SparklesIcon} size=${14} /> The Local Visibility Gap
+                                </span>
+                                <h3 className="text-xl font-black text-white mt-1">Why Top 3-Pack Rankings Win Every Time</h3>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Live Market Benchmark
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Unoptimized -->
+                            <div className="p-5 bg-white/5 rounded-2xl border border-white/10 space-y-3">
+                                <div className="flex justify-between items-center text-xs font-black">
+                                    <span className="text-gray-400 uppercase tracking-wider">Unoptimized Local Profile</span>
+                                    <span className="text-red-400 bg-red-950/60 px-2.5 py-0.5 rounded-full border border-red-800/40">~38% Profile Score</span>
+                                </div>
+                                <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden">
+                                    <div className="bg-red-500 h-full rounded-full w-[38%] transition-all duration-1000"></div>
+                                </div>
+                                <ul className="text-xs text-gray-400 space-y-1.5 pt-1">
+                                    <li className="flex items-center gap-2"><span className="text-red-400 font-bold">✕</span> Buried on Page 2 (84% of searchers never see you)</li>
+                                    <li className="flex items-center gap-2"><span className="text-red-400 font-bold">✕</span> Missing primary local category & photo signals</li>
+                                    <li className="flex items-center gap-2"><span className="text-red-400 font-bold">✕</span> Bleeding ready-to-buy customers to competitors</li>
+                                </ul>
+                            </div>
+
+                            <!-- Audited & Optimized -->
+                            <div className="p-5 bg-emerald-950/20 rounded-2xl border border-emerald-500/30 space-y-3">
+                                <div className="flex justify-between items-center text-xs font-black">
+                                    <span className="text-emerald-400 uppercase tracking-wider">Audited & Fully Optimized Profile</span>
+                                    <span className="text-emerald-300 bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-700/50">96%+ Score</span>
+                                </div>
+                                <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden">
+                                    <div className="bg-emerald-400 h-full rounded-full w-[96%] transition-all duration-1000"></div>
+                                </div>
+                                <ul className="text-xs text-emerald-100/80 space-y-1.5 pt-1">
+                                    <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> Locked into the Google 3-Pack map view</li>
+                                    <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> Maximum citation accuracy & review velocity</li>
+                                    <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> Captures 4.2x more direct phone calls and bookings</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 text-center text-xs font-bold text-gray-400 flex items-center justify-center gap-2">
+                            <span>Ready to see where your business stands?</span>
+                            <span className="text-red-400 flex items-center gap-1">Complete your free scan below <${ArrowRightIcon} size=${14} /></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
 
         // --- COMPONENTS ---
 
@@ -288,12 +497,184 @@
             `;
         };
 
-        const AuditResultView = ({ result, businessName, onReset }) => {
-            const handlePrint = () => window.print();
+        const SubscriptionModal = ({ isOpen, onClose, onActivateSubscription, paypalSubUrl }) => {
+            if (!isOpen) return null;
+            return html`
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-[36px] max-w-lg w-full p-8 md:p-10 shadow-2xl relative border border-gray-100 overflow-hidden">
+                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-red-500/10 rounded-full blur-2xl"></div>
+                        <button onClick=${onClose} className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                            <${XIcon} size=${24} />
+                        </button>
+
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full text-xs font-black uppercase tracking-wider">
+                                <${CrownIcon} size=${16} className="text-amber-600" /> Unlimited Pro Membership
+                            </div>
+
+                            <div className="space-y-2">
+                                <h3 className="text-3xl font-black text-gray-900 tracking-tight">Unlimited Audits & PDF Exports</h3>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-5xl font-black text-red-600">$19</span>
+                                    <span className="text-gray-400 font-bold text-lg">/ month</span>
+                                </div>
+                                <p className="text-gray-500 text-sm leading-relaxed">
+                                    Get unlimited profile scans every week and free instant PDF downloads and executive email summaries for your business and clients.
+                                </p>
+                            </div>
+
+                            <div className="space-y-3 py-2 border-y border-gray-100">
+                                <div className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                        <${CheckIcon} size=${14} />
+                                    </div>
+                                    <span>Unlimited profile audits every week (No 3/week cap)</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                        <${CheckIcon} size=${14} />
+                                    </div>
+                                    <span>Free high-resolution PDF downloads on all audits</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                        <${CheckIcon} size=${14} />
+                                    </div>
+                                    <span>Direct executive email summaries to your inbox</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                        <${CheckIcon} size=${14} />
+                                    </div>
+                                    <span>Priority Gemini Precision Intelligence processing</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 pt-2">
+                                <a 
+                                    href=${paypalSubUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="w-full py-4 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-lg shadow-red-200 transition-all active:scale-[0.98]"
+                                >
+                                    <${CreditCardIcon} size=${20} /> Subscribe via PayPal ($19/mo)
+                                </a>
+
+                                <button 
+                                    onClick=${onActivateSubscription}
+                                    className="w-full py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-2xl font-bold text-sm border border-gray-200 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <${ShieldCheckIcon} size=${18} className="text-emerald-600" /> I've Subscribed via PayPal (Activate Pro Access)
+                                </button>
+                            </div>
+
+                            <p className="text-center text-xs text-gray-400 font-medium">
+                                Secure subscription via PayPal • Cancel anytime in PayPal
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const ReportUnlockModal = ({ isOpen, onClose, businessName, onUnlockSingle, onShowSubscribe, paypalDocUrl }) => {
+            if (!isOpen) return null;
+            return html`
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-[36px] max-w-xl w-full p-8 md:p-10 shadow-2xl relative border border-gray-100 overflow-hidden">
+                        <button onClick=${onClose} className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                            <${XIcon} size=${24} />
+                        </button>
+
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-red-50 border border-red-200 text-red-700 rounded-full text-xs font-black uppercase tracking-wider">
+                                    <${LockIcon} size=${14} /> PDF & Email Access
+                                </div>
+                                <h3 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Unlock Report for ${businessName}</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed">
+                                    Non-subscribers can unlock this PDF download and email report for just $2.00, or get the Unlimited Membership for $19/month.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Option 1: Single Report -->
+                                <div className="p-6 bg-gray-50 hover:bg-red-50/40 rounded-3xl border-2 border-gray-200 hover:border-red-300 transition-all flex flex-col justify-between space-y-4">
+                                    <div className="space-y-2">
+                                        <span className="text-xs font-black uppercase tracking-widest text-gray-400">Single Audit</span>
+                                        <div className="text-3xl font-black text-gray-900">$2.00</div>
+                                        <p className="text-xs text-gray-600 leading-relaxed">
+                                            Instant PDF report download & email summary for <span className="font-bold text-gray-900">${businessName}</span>.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 pt-2">
+                                        <a 
+                                            href=${paypalDocUrl}
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                                        >
+                                            <${CreditCardIcon} size=${16} /> Pay $2.00 via PayPal
+                                        </a>
+                                        <button 
+                                            onClick=${onUnlockSingle}
+                                            className="w-full py-2.5 bg-white hover:bg-gray-100 text-gray-800 rounded-xl font-bold text-xs border border-gray-200 transition-all"
+                                        >
+                                            Confirm Paid ($2.00)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Option 2: Unlimited Pro -->
+                                <div className="p-6 bg-gradient-to-b from-red-950 to-red-900 text-white rounded-3xl border-2 border-red-800 flex flex-col justify-between space-y-4 shadow-lg relative overflow-hidden">
+                                    <div className="absolute top-2 right-2 px-2.5 py-0.5 bg-amber-400 text-amber-950 text-[10px] font-black uppercase tracking-wider rounded-full">
+                                        Best Value
+                                    </div>
+                                    <div className="space-y-2">
+                                        <span className="text-xs font-black uppercase tracking-widest text-red-200">Unlimited Pass</span>
+                                        <div className="text-3xl font-black text-white">$19<span className="text-sm font-medium text-red-200">/mo</span></div>
+                                        <p className="text-xs text-red-200 leading-relaxed">
+                                            Unlimited audits every week + unlimited PDF downloads & email reports for all businesses.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 pt-2">
+                                        <button 
+                                            onClick=${onShowSubscribe}
+                                            className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-amber-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                                        >
+                                            <${CrownIcon} size=${16} /> Get Unlimited ($19/mo)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="text-center pt-2">
+                                <button onClick=${onClose} className="text-xs font-bold text-gray-400 hover:text-gray-600">
+                                    Cancel & Return
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const AuditResultView = ({ result, businessName, onReset, isAdmin, isSubscriber, isUnlocked, onUnlockRequest }) => {
+            const handlePrint = () => {
+                if (isAdmin || isSubscriber || isUnlocked) {
+                    window.print();
+                } else {
+                    onUnlockRequest('download');
+                }
+            };
             const [isEmailing, setIsEmailing] = useState(false);
             const [emailSent, setEmailSent] = useState(false);
 
             const handleEmailSummary = async () => {
+                if (!isAdmin && !isSubscriber && !isUnlocked) {
+                    onUnlockRequest('email');
+                    return;
+                }
                 setIsEmailing(true);
                 try {
                     const response = await fetch(`${API_BASE}/api/email-summary`, {
@@ -308,6 +689,8 @@
                     setIsEmailing(false);
                 }
             };
+
+            const isAccessGranted = isAdmin || isSubscriber || isUnlocked;
 
             return html`
                 <div className="fade-in space-y-12">
@@ -367,26 +750,39 @@
                     <div id="action-buttons" className="no-print bg-red-950 rounded-[40px] p-12 text-white text-center shadow-2xl space-y-8 overflow-hidden relative">
                         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-red-500 opacity-10 rounded-full"></div>
                         <div className="relative">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-900/80 border border-red-700/50 rounded-full text-xs font-bold text-red-200 mb-4">
+                                ${isAccessGranted 
+                                    ? html`<${CrownIcon} size=${14} className="text-amber-400" /> ${isAdmin ? 'Admin Unlimited Access' : isSubscriber ? 'PRO Subscriber Access' : 'Report Unlocked'}`
+                                    : html`<${LockIcon} size=${14} className="text-amber-400" /> Pay $2.00 to Download / Email or $19/mo Unlimited`}
+                            </div>
                             <h2 className="text-4xl font-black mb-4">Protect Your Rankings</h2>
                             <p className="text-red-200 max-w-xl mx-auto text-lg">
-                                Download this expert report, email a summary, or start a fresh audit.
+                                Download this expert report, email a summary to your team, or start a fresh audit.
                             </p>
                         </div>
                         
                         <div className="flex flex-wrap justify-center gap-5 relative">
                             <button 
                                 onClick=${handlePrint}
-                                className="bg-white text-red-950 px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-red-50 transition-all active:scale-95"
+                                className="bg-white text-red-950 px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-red-50 transition-all active:scale-95 shadow-lg"
                             >
-                                <${DownloadIcon} size=${20} /> Save as PDF
+                                <${DownloadIcon} size=${20} /> ${isAccessGranted ? 'Save as PDF' : 'Save as PDF ($2.00)'}
                             </button>
                             <button 
                                 onClick=${handleEmailSummary}
                                 disabled=${isEmailing || emailSent}
-                                className=${`px-8 py-4 rounded-2xl font-black flex items-center gap-3 transition-all active:scale-95 border ${emailSent ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white border-red-400/30 hover:bg-red-500'}`}
+                                className=${`px-8 py-4 rounded-2xl font-black flex items-center gap-3 transition-all active:scale-95 border shadow-lg ${emailSent ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white border-red-400/30 hover:bg-red-500'}`}
                             >
-                                <${MailIcon} size=${20} /> ${emailSent ? 'Summary Sent!' : isEmailing ? 'Preparing...' : 'Email Summary'}
+                                <${MailIcon} size=${20} /> ${emailSent ? 'Summary Sent!' : isEmailing ? 'Preparing...' : isAccessGranted ? 'Email Summary' : 'Email Summary ($2.00)'}
                             </button>
+                            ${(!isAdmin && !isSubscriber) && html`
+                                <button 
+                                    onClick=${() => onUnlockRequest('subscribe')}
+                                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-7 py-4 rounded-2xl font-black flex items-center gap-2 transition-all active:scale-95 shadow-lg"
+                                >
+                                    <${CrownIcon} size=${20} /> Unlimited Pass ($19/mo)
+                                </button>
+                            `}
                             <button 
                                 onClick=${onReset}
                                 className="bg-transparent text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-white/10 transition-all active:scale-95 border border-white/20"
@@ -429,7 +825,7 @@
             `;
         };
 
-        const BusinessInputForm = ({ onSubmit, isLoading }) => {
+        const BusinessInputForm = ({ onSubmit, isLoading, isAdmin, isSubscriber, auditsThisWeek, weeklyLimit, onUpgradeRequest, user }) => {
             const [formData, setFormData] = useState({
                 businessName: '',
                 location: '',
@@ -438,6 +834,15 @@
                 phoneNumber: ''
             });
 
+            // Prefill email if user is already logged in
+            useEffect(() => {
+                if (user?.email && !formData.email) {
+                    setFormData(prev => ({ ...prev, email: user.email }));
+                }
+            }, [user]);
+
+            const isLimitReached = !isAdmin && !isSubscriber && auditsThisWeek >= weeklyLimit;
+
             const handleChange = (e) => {
                 const { name, value } = e.target;
                 setFormData(prev => ({ ...prev, [name]: value }));
@@ -445,6 +850,10 @@
 
             const handleSubmit = (e) => {
                 e.preventDefault();
+                if (isLimitReached) {
+                    onUpgradeRequest();
+                    return;
+                }
                 onSubmit(formData);
             };
 
@@ -454,6 +863,31 @@
                         <h2 className="text-3xl font-black text-gray-900 tracking-tight">Audit Request</h2>
                         <p className="text-gray-500">Provide your basic profile details for a comprehensive metric scan.</p>
                     </div>
+
+                    <!-- Quota Indicator (Hidden for Admin) -->
+                    ${(!isAdmin && (isSubscriber || isLimitReached || auditsThisWeek > 0)) ? html`
+                        <div className=${`mb-8 p-4 rounded-2xl border text-sm flex flex-col sm:flex-row justify-between items-center gap-3 ${isSubscriber ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : isLimitReached ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                            <div className="flex items-center gap-3">
+                                ${isSubscriber ? html`<${CrownIcon} size=${20} className="text-emerald-600" />` : isLimitReached ? html`<${AlertCircleIcon} size=${20} className="text-amber-600" />` : html`<${BarChartIcon} size=${20} className="text-gray-500" />`}
+                                <span className="font-bold">
+                                    ${isSubscriber 
+                                        ? 'PRO Member: Unlimited Weekly Audits & Reports Active' 
+                                        : isLimitReached
+                                        ? html`Weekly Free Limit Reached: <span className="font-black text-red-600">${auditsThisWeek}/${weeklyLimit}</span> free audits used this week.`
+                                        : html`Free Tier: <span className="text-red-600 font-black">${auditsThisWeek}</span> of <span className="font-black">${weeklyLimit}</span> free audits used this week (${Math.max(0, weeklyLimit - auditsThisWeek)} remaining)`}
+                                </span>
+                            </div>
+                            ${!isSubscriber && html`
+                                <button 
+                                    type="button" 
+                                    onClick=${onUpgradeRequest}
+                                    className="text-xs font-black text-red-600 hover:text-red-700 hover:underline flex items-center gap-1.5 flex-shrink-0"
+                                >
+                                    <${CrownIcon} size=${14} /> Upgrade to Unlimited ($19/mo)
+                                </button>
+                            `}
+                        </div>
+                    ` : null}
 
                     <form onSubmit=${handleSubmit} className="space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -528,109 +962,270 @@
                             </div>
                         </div>
 
-                        <button 
-                            type="submit" 
-                            disabled=${isLoading}
-                            className="w-full py-5 bg-red-600 hover:bg-red-700 text-white rounded-3xl font-black text-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 group"
-                        >
-                            ${isLoading ? 'Analyzing Signals...' : html`
-                                Generate Expert Audit <${RocketIcon} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                        ${isLimitReached ? html`
+                            <button 
+                                type="button" 
+                                onClick=${onUpgradeRequest}
+                                className="w-full py-5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white rounded-3xl font-black text-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] flex items-center justify-center gap-4 group"
+                            >
+                                <${CrownIcon} size=${24} /> Weekly Limit Reached (3/3) — Upgrade to Unlimited ($19/mo)
+                            </button>
+                        ` : html`
+                            <button 
+                                type="submit" 
+                                disabled=${isLoading}
+                                className="w-full py-5 bg-red-600 hover:bg-red-700 text-white rounded-3xl font-black text-xl shadow-lg shadow-red-200 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 group"
+                            >
+                                ${isLoading ? 'Analyzing Signals...' : html`
+                                    Generate Expert Audit <${RocketIcon} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                `}
+                            </button>
+                        `}
+
+                        <div className="flex items-center justify-center gap-2 pt-2 text-xs text-gray-400 font-semibold text-center">
+                            ${!user ? html`
+                                <span className="inline-flex items-center gap-1.5 text-gray-500">
+                                    <${GoogleIcon} /> Seamless 1-click Google authentication tracks & saves your audit reports
+                                </span>
+                            ` : html`
+                                <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                                    <${CheckIcon} size=${14} /> Signed in as ${user.email || user.displayName} • Audit tracking active
+                                </span>
                             `}
-                        </button>
+                        </div>
                     </form>
                 </div>
             `;
         };
 
-        const AdminPanel = ({ history, onClear, onClose, onViewAudit }) => html`
-            <div className="glass-card p-10 animate-fade-in max-w-6xl mx-auto w-full">
-                <div className="flex justify-between items-center mb-10 border-b border-gray-100 pb-6">
-                    <div>
-                        <h2 className="text-3xl font-black text-gray-900">Audit Vault</h2>
-                        <p className="text-gray-500">History of all profile scans generated through this instance.</p>
-                    </div>
-                    <button onClick=${onClose} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors">
-                        <${XIcon} size=${28} />
-                    </button>
-                </div>
+        const AdminPanel = ({ history, onClear, onClose, onViewAudit, adminEmail, paypalSubUrl, paypalDocUrl, onSavePaypalUrls }) => {
+            const [subUrlInput, setSubUrlInput] = useState(paypalSubUrl || '');
+            const [docUrlInput, setDocUrlInput] = useState(paypalDocUrl || '');
+            const [isSaved, setIsSaved] = useState(false);
 
-                ${history.length === 0 ? html`
-                    <div className="py-20 text-center space-y-4">
-                        <div className="inline-block p-6 bg-gray-50 rounded-[40px] text-gray-300">
-                             <${SearchIcon} size=${64} />
+            const handleSaveUrls = (e) => {
+                e.preventDefault();
+                onSavePaypalUrls(subUrlInput, docUrlInput);
+                setIsSaved(true);
+                setTimeout(() => setIsSaved(false), 3000);
+            };
+
+            const totalScans = history.length;
+            const avgScore = totalScans > 0 ? Math.round(history.reduce((acc, h) => acc + (h.overallScore || 0), 0) / totalScans) : 0;
+            const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const scansThisWeek = history.filter(h => h.timestamp && new Date(h.timestamp).getTime() >= weekAgo).length;
+
+            return html`
+                <div className="glass-card p-8 md:p-12 animate-fade-in max-w-6xl mx-auto w-full space-y-10">
+                    <!-- Header -->
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
+                        <div>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-black uppercase tracking-wider mb-2">
+                                <${ShieldCheckIcon} size=${14} /> Authorized Admin Console
+                            </div>
+                            <h2 className="text-3xl font-black text-gray-900">Audit Vault & Management</h2>
+                            <p className="text-gray-500 text-sm">Restricted to marketingmanagementenp.365@gmail.com & customerservice.mme365@gmail.com</p>
                         </div>
-                        <p className="text-gray-400 font-bold text-xl">No scan history found.</p>
+                        <div className="flex items-center gap-3">
+                            <span className="hidden sm:inline-block text-xs font-bold text-gray-500 bg-gray-100 px-3 py-2 rounded-xl">
+                                ${adminEmail}
+                            </span>
+                            <button onClick=${onClose} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors">
+                                <${XIcon} size=${28} />
+                            </button>
+                        </div>
                     </div>
-                ` : html`
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Company</th>
-                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Score</th>
-                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Contact</th>
-                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Market</th>
-                                    <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest whitespace-nowrap">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                ${history.map((entry, idx) => html`
-                                    <tr key=${idx} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-6 font-bold text-gray-900">
-                                            <div className="flex flex-col">
-                                                <span>${entry.businessName}</span>
-                                                <span className="text-xs text-indigo-500 font-medium">${entry.website || 'No Website'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-6 font-black">
-                                            <span className=${`px-3 py-1 rounded-full text-sm ${entry.overallScore < 40 ? 'bg-red-50 text-red-600' : entry.overallScore < 75 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                ${entry.overallScore}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-6 text-gray-600">
-                                            <div className="flex flex-col">
-                                                <span className="font-bold whitespace-nowrap">${entry.email}</span>
-                                                <span className="text-xs">${entry.phoneNumber}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-6 text-gray-500">${entry.location}</td>
-                                        <td className="px-6 py-6">
-                                            <button 
-                                                onClick=${() => onViewAudit(entry)}
-                                                className="text-red-600 font-black hover:underline whitespace-nowrap flex items-center gap-1"
-                                            >
-                                                View <${ExternalLinkIcon} size=${14} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                `)}
-                            </tbody>
-                        </table>
+
+                    <!-- Metrics bar -->
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100 space-y-1">
+                            <span className="text-xs font-black uppercase tracking-widest text-gray-400">Total Leads in Vault</span>
+                            <div className="text-4xl font-black text-gray-900">${totalScans}</div>
+                            <p className="text-xs text-gray-500">All recorded audit submissions</p>
+                        </div>
+                        <div className="p-6 bg-red-50/60 rounded-3xl border border-red-100 space-y-1">
+                            <span className="text-xs font-black uppercase tracking-widest text-red-400">Scans This Week</span>
+                            <div className="text-4xl font-black text-red-600">${scansThisWeek}</div>
+                            <p className="text-xs text-red-600/70">Standard user quota: 3/week</p>
+                        </div>
+                        <div className="p-6 bg-emerald-50/60 rounded-3xl border border-emerald-100 space-y-1">
+                            <span className="text-xs font-black uppercase tracking-widest text-emerald-600">Average Profile Score</span>
+                            <div className="text-4xl font-black text-emerald-700">${avgScore}<span className="text-xl font-bold text-gray-400">/100</span></div>
+                            <p className="text-xs text-emerald-600/70">Calculated across vault</p>
+                        </div>
                     </div>
-                    <div className="mt-12 flex justify-end">
-                        <button 
-                            onClick=${onClear}
-                            className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black hover:bg-red-100 transition-colors flex items-center gap-2"
-                        >
-                            <${TrashIcon} size=${18} /> Purge Vault
-                        </button>
+
+                    <!-- PayPal Monetization Links Management -->
+                    <div className="p-8 bg-gradient-to-br from-gray-50 to-red-50/30 rounded-3xl border border-gray-200 space-y-6">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                                    <${CreditCardIcon} size=${20} className="text-red-600" /> PayPal Monetization Links
+                                </h3>
+                                <p className="text-xs text-gray-500">Configure your PayPal payment and subscription links for non-subscribers.</p>
+                            </div>
+                            ${isSaved && html`
+                                <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1 self-start">
+                                    <${CheckIcon} size=${14} /> Links Updated!
+                                </span>
+                            `}
+                        </div>
+
+                        <form onSubmit=${handleSaveUrls} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                                    <span>$19.00 / Mo Unlimited Subscription Link</span>
+                                    <span className="text-[10px] text-red-600 font-bold">Recurring</span>
+                                </label>
+                                <input 
+                                    type="url"
+                                    value=${subUrlInput}
+                                    onChange=${(e) => setSubUrlInput(e.target.value)}
+                                    placeholder="https://www.paypal.com/..."
+                                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-200 focus:border-red-600"
+                                />
+                                <p className="text-[11px] text-gray-400">Used when users hit their 3/week limit or click 'Unlimited Pass'.</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                                    <span>$2.00 Single Report PDF/Email Link</span>
+                                    <span className="text-[10px] text-gray-500 font-bold">One-Time</span>
+                                </label>
+                                <input 
+                                    type="url"
+                                    value=${docUrlInput}
+                                    onChange=${(e) => setDocUrlInput(e.target.value)}
+                                    placeholder="https://www.paypal.com/..."
+                                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-200 focus:border-red-600"
+                                />
+                                <p className="text-[11px] text-gray-400">Used when non-subscribers click 'Save as PDF' or 'Email Summary'.</p>
+                            </div>
+
+                            <div className="md:col-span-2 flex justify-end">
+                                <button 
+                                    type="submit"
+                                    className="px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-xl text-sm font-bold shadow-md transition-all"
+                                >
+                                    Save PayPal Links
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                `}
-            </div>
-        `;
+
+                    <!-- Leads Table -->
+                    ${history.length === 0 ? html`
+                        <div className="py-20 text-center space-y-4">
+                            <div className="inline-block p-6 bg-gray-50 rounded-[40px] text-gray-300">
+                                <${SearchIcon} size=${64} />
+                            </div>
+                            <p className="text-gray-400 font-bold text-xl">No scan history found.</p>
+                        </div>
+                    ` : html`
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-black text-gray-900">Submitted Leads</h3>
+                            <div className="overflow-x-auto border border-gray-100 rounded-2xl">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Company</th>
+                                            <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Score</th>
+                                            <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Contact</th>
+                                            <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">Market</th>
+                                            <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest whitespace-nowrap">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 bg-white">
+                                        ${history.map((entry, idx) => html`
+                                            <tr key=${idx} className="hover:bg-gray-50/70 transition-colors">
+                                                <td className="px-6 py-6 font-bold text-gray-900">
+                                                    <div className="flex flex-col">
+                                                        <span>${entry.businessName}</span>
+                                                        <span className="text-xs text-indigo-500 font-medium">${entry.website || 'No Website'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-6 font-black">
+                                                    <span className=${`px-3 py-1 rounded-full text-sm font-black ${entry.overallScore < 40 ? 'bg-red-50 text-red-600' : entry.overallScore < 75 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                        ${entry.overallScore}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-6 text-gray-600">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold whitespace-nowrap text-gray-900">${entry.email}</span>
+                                                        <span className="text-xs text-gray-500">${entry.phoneNumber}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-6 text-gray-500">${entry.location}</td>
+                                                <td className="px-6 py-6">
+                                                    <button 
+                                                        onClick=${() => onViewAudit(entry)}
+                                                        className="text-red-600 font-black hover:underline whitespace-nowrap flex items-center gap-1"
+                                                    >
+                                                        View <${ExternalLinkIcon} size=${14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                            <button 
+                                onClick=${onClear}
+                                className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black hover:bg-red-100 transition-colors flex items-center gap-2"
+                            >
+                                <${TrashIcon} size=${18} /> Purge Vault
+                            </button>
+                        </div>
+                    `}
+                </div>
+            `;
+        };
 
         // --- MAIN APP ---
+
+        const ADMIN_EMAILS = [
+            "customerservice.mme365@gmail.com",
+            "marketingmanagementenp.365@gmail.com"
+        ];
+
+        const DEFAULT_PAYPAL_SUB = "https://www.paypal.com/cgi-bin/webscr?cmd=_xclick-subscriptions&business=customerservice.mme365@gmail.com&item_name=GBP+Auditor+Unlimited+Monthly+Pass&a3=19.00&p3=1&t3=M&src=1";
+        const DEFAULT_PAYPAL_DOC = "https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=customerservice.mme365@gmail.com&item_name=GBP+Audit+Report+PDF&amount=2.00&currency_code=USD";
+        const WEEKLY_FREE_LIMIT = 3;
 
         const App = () => {
             const [user, setUser] = useState(null);
             const [isLoading, setIsLoading] = useState(false);
             const [isInitialLoading, setIsInitialLoading] = useState(true);
             const [result, setResult] = useState(null);
-            const [selectedLead, setSelectedLead] = useState(null);
             const [error, setError] = useState(null);
             const [activeBusiness, setActiveBusiness] = useState('');
             const [history, setHistory] = useState([]);
             const [showAdmin, setShowAdmin] = useState(false);
+
+            // Monetization & Subscription state
+            const [isSubscriber, setIsSubscriber] = useState(false);
+            const [unlockedAudits, setUnlockedAudits] = useState([]);
+            const [showSubModal, setShowSubModal] = useState(false);
+            const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+            const [paypalSubUrl, setPaypalSubUrl] = useState(() => {
+                return localStorage.getItem('gbp_paypal_sub_url') || DEFAULT_PAYPAL_SUB;
+            });
+            const [paypalDocUrl, setPaypalDocUrl] = useState(() => {
+                return localStorage.getItem('gbp_paypal_doc_url') || DEFAULT_PAYPAL_DOC;
+            });
+
+            const handleSavePaypalUrls = (sub, doc) => {
+                const cleanSub = sub || DEFAULT_PAYPAL_SUB;
+                const cleanDoc = doc || DEFAULT_PAYPAL_DOC;
+                setPaypalSubUrl(cleanSub);
+                setPaypalDocUrl(cleanDoc);
+                localStorage.setItem('gbp_paypal_sub_url', cleanSub);
+                localStorage.setItem('gbp_paypal_doc_url', cleanDoc);
+            };
 
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -639,6 +1234,44 @@
                 });
                 return unsubscribe;
             }, []);
+
+            // Check if current user is an authorized admin
+            const isAdmin = Boolean(user?.email && ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase().trim()));
+
+            // Load subscription & unlocked reports for logged in user
+            useEffect(() => {
+                if (!user) {
+                    setIsSubscriber(false);
+                    setUnlockedAudits([]);
+                    return;
+                }
+                const subStatus = localStorage.getItem(`gbp_sub_${user.uid}`) === 'true';
+                setIsSubscriber(subStatus);
+                try {
+                    const unlocked = JSON.parse(localStorage.getItem(`gbp_unlocked_${user.uid}`) || '[]');
+                    setUnlockedAudits(unlocked);
+                } catch (e) {
+                    setUnlockedAudits([]);
+                }
+            }, [user]);
+
+            const activateSubscription = () => {
+                if (!user) return;
+                setIsSubscriber(true);
+                localStorage.setItem(`gbp_sub_${user.uid}`, 'true');
+                setShowSubModal(false);
+                setShowUnlockModal(false);
+                alert("Unlimited Pro access activated! You now have unlimited audits and free PDF downloads.");
+            };
+
+            const unlockSingleReport = () => {
+                if (!user || !activeBusiness) return;
+                const updated = [...new Set([...unlockedAudits, activeBusiness])];
+                setUnlockedAudits(updated);
+                localStorage.setItem(`gbp_unlocked_${user.uid}`, JSON.stringify(updated));
+                setShowUnlockModal(false);
+                alert(`Report for "${activeBusiness}" is unlocked! You can now download the PDF and email the executive summary.`);
+            };
 
             const login = async () => {
                 const provider = new GoogleAuthProvider();
@@ -649,9 +1282,10 @@
                 }
             };
 
-            const logout = () => signOut(auth);
-
-            const adminEmail = "customerservice.mme365@gmail.com"; // Set the authorized admin email
+            const logout = () => {
+                setShowAdmin(false);
+                signOut(auth);
+            };
 
             useEffect(() => {
                 if (!user) return;
@@ -659,8 +1293,8 @@
                 const fetchHistory = async () => {
                     try {
                         let q;
-                        if (user.email === adminEmail) {
-                            // Admin sees all leads
+                        if (isAdmin) {
+                            // Authorized Admins see all leads
                             q = query(
                                 collection(db, "leads"), 
                                 orderBy("timestamp", "desc")
@@ -681,10 +1315,39 @@
                     }
                 };
                 fetchHistory();
-            }, [user]);
+            }, [user, isAdmin]);
+
+            // Calculate audits conducted by this user in the past 7 days
+            const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const auditsThisWeek = history.filter(h => h.timestamp && new Date(h.timestamp).getTime() >= weekAgo).length;
 
             const runAudit = async (data) => {
-                if (!user) return;
+                let activeUser = user;
+
+                // 1-Click Google Sign-in on audit generation if not yet authenticated
+                if (!activeUser) {
+                    try {
+                        const provider = new GoogleAuthProvider();
+                        const cred = await signInWithPopup(auth, provider);
+                        activeUser = cred.user;
+                        setUser(activeUser);
+                    } catch (authErr) {
+                        console.log("Google sign-in closed or aborted by user:", authErr);
+                        return;
+                    }
+                }
+
+                if (!activeUser) return;
+
+                const userIsAdmin = Boolean(activeUser.email && ADMIN_EMAILS.map(e => e.toLowerCase()).includes(activeUser.email.toLowerCase().trim()));
+                const userIsSub = localStorage.getItem(`gbp_sub_${activeUser.uid}`) === 'true';
+
+                // Enforce 3 audits per week for standard users
+                if (!userIsAdmin && !userIsSub && auditsThisWeek >= WEEKLY_FREE_LIMIT) {
+                    setShowSubModal(true);
+                    return;
+                }
+
                 setIsLoading(true);
                 setError(null);
                 setResult(null);
@@ -704,10 +1367,13 @@
                     if (!response.ok) throw new Error("Audit generation failed");
                     const auditResult = await response.json();
 
-                    // Save lead to Firestore
+                    // Save lead to Firestore with verified Google user tracking
                     const leadData = {
                         ...data,
-                        userId: user.uid,
+                        email: data.email || activeUser.email || '',
+                        userEmail: activeUser.email || '',
+                        userDisplayName: activeUser.displayName || '',
+                        userId: activeUser.uid,
                         overallScore: auditResult.overallScore,
                         auditBreakdown: auditResult.auditBreakdown,
                         recommendations: auditResult.recommendations,
@@ -740,7 +1406,6 @@
                     setActiveBusiness(lead.businessName);
                     setShowAdmin(false);
                 } else {
-                    // Fallback for older leads or if generation is needed
                     setResult({
                         overallScore: lead.overallScore,
                         auditBreakdown: [
@@ -756,8 +1421,8 @@
             };
 
             const clearHistory = async () => {
-                if (user?.email !== adminEmail) {
-                    alert("Unauthorized access restricted.");
+                if (!isAdmin) {
+                    alert("Unauthorized access restricted to verified admins.");
                     return;
                 }
                 
@@ -789,49 +1454,139 @@
                                 <h1 className="text-4xl font-black text-gray-900 tracking-tighter">GBP Auditor <span className="text-red-600">Pro</span></h1>
                                 <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-xs">AI-Driven Local SEO Intelligence</p>
                             </div>
-                            <div className="flex items-center gap-4">
-                                ${user && html`
+                            <div className="flex items-center gap-3">
+                                ${user ? html`
+                                    <!-- User Status / Tier -->
+                                    <div className="hidden sm:flex items-center gap-2 mr-2">
+                                        ${isAdmin ? html`
+                                            <span className="px-3 py-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-black rounded-xl flex items-center gap-1.5">
+                                                <${ShieldCheckIcon} size=${14} /> Admin
+                                            </span>
+                                        ` : isSubscriber ? html`
+                                            <span className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black rounded-xl flex items-center gap-1.5">
+                                                <${CrownIcon} size=${14} className="text-emerald-600" /> Pro Member
+                                            </span>
+                                        ` : html`
+                                            <button 
+                                                onClick=${() => setShowSubModal(true)}
+                                                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-black rounded-xl flex items-center gap-1.5 transition-colors"
+                                            >
+                                                <${CrownIcon} size=${14} className="text-amber-600" /> ${auditsThisWeek}/${WEEKLY_FREE_LIMIT} Audits • Upgrade ($19/mo)
+                                            </button>
+                                        `}
+                                    </div>
+
                                     <div className="hidden md:flex flex-col items-end mr-2">
-                                        <span className="text-sm font-black text-gray-900">${user.displayName}</span>
+                                        <span className="text-sm font-black text-gray-900">${user.displayName || user.email}</span>
                                         <button onClick=${logout} className="text-[10px] font-black text-red-600 uppercase tracking-widest hover:text-red-500">Sign Out</button>
                                     </div>
+                                ` : html`
+                                    <button 
+                                        onClick=${login}
+                                        className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 hover:border-red-200 rounded-2xl text-xs font-black text-gray-800 flex items-center gap-2 shadow-sm transition-all active:scale-95"
+                                    >
+                                        <${GoogleIcon} /> Sign In
+                                    </button>
                                 `}
-                                <button 
-                                    onClick=${() => setShowAdmin(!showAdmin)}
-                                    className="p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-400 hover:text-red-600 transition-colors"
-                                >
-                                    <${SettingsIcon} size=${24} />
-                                </button>
+
+                                <!-- Admin Vault button: ONLY displayed to verified administrators -->
+                                ${isAdmin && html`
+                                    <button 
+                                        onClick=${() => setShowAdmin(!showAdmin)}
+                                        className=${`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-2 border transition-all shadow-sm ${showAdmin ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-200'}`}
+                                    >
+                                        <${SettingsIcon} size=${18} /> Admin Vault
+                                    </button>
+                                `}
                             </div>
                         </header>
 
                         <main>
-                            ${!user ? html`
-                                <${LoginView} onLogin=${login} />
-                            ` : showAdmin ? html`
-                                <${AdminPanel} history=${history} onClear=${clearHistory} onClose=${() => setShowAdmin(false)} onViewAudit=${viewAudit} />
+                            ${(showAdmin && isAdmin) ? html`
+                                <${AdminPanel} 
+                                    history=${history} 
+                                    onClear=${clearHistory} 
+                                    onClose=${() => setShowAdmin(false)} 
+                                    onViewAudit=${viewAudit}
+                                    adminEmail=${user?.email}
+                                    paypalSubUrl=${paypalSubUrl}
+                                    paypalDocUrl=${paypalDocUrl}
+                                    onSavePaypalUrls=${handleSavePaypalUrls}
+                                />
                             ` : isLoading ? html`
                                 <${Loader} />
                             ` : result ? html`
-                                <${AuditResultView} result=${result} businessName=${activeBusiness} onReset=${() => setResult(null)} />
+                                <${AuditResultView} 
+                                    result=${result} 
+                                    businessName=${activeBusiness} 
+                                    onReset=${() => setResult(null)}
+                                    isAdmin=${isAdmin}
+                                    isSubscriber=${isSubscriber}
+                                    isUnlocked=${unlockedAudits.includes(activeBusiness)}
+                                    onUnlockRequest=${(type) => {
+                                        if (type === 'subscribe') {
+                                            setShowSubModal(true);
+                                        } else {
+                                            setShowUnlockModal(true);
+                                        }
+                                    }}
+                                />
                             ` : html`
-                                <div className="space-y-20">
+                                <div className="space-y-16">
                                     <div className="text-center space-y-6 pt-10">
                                         <h2 className="text-5xl md:text-7xl font-black text-gray-900 leading-none tracking-tight">Are you losing <br/><span className="text-red-600">Local Customers?</span></h2>
                                         <p className="text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
                                             Most Google Business Profiles are only 40% optimized. Get an instant multi-signal audit to discover how to dominate your local market.
                                         </p>
                                     </div>
-                                    <${BusinessInputForm} onSubmit=${runAudit} isLoading=${isLoading} />
+
+                                    <!-- Animated Stats Section Under "Are you losing Local Customers?" -->
+                                    <${LocalStatsSection} />
+
+                                    <${BusinessInputForm} 
+                                        onSubmit=${runAudit} 
+                                        isLoading=${isLoading}
+                                        isAdmin=${isAdmin}
+                                        isSubscriber=${isSubscriber}
+                                        auditsThisWeek=${auditsThisWeek}
+                                        weeklyLimit=${WEEKLY_FREE_LIMIT}
+                                        onUpgradeRequest=${() => setShowSubModal(true)}
+                                        user=${user}
+                                    />
                                 </div>
                             `}
                         </main>
 
-                        <footer className="no-print pt-20 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 text-gray-400 font-bold text-sm">
-                            <div className="flex items-center gap-2">
-                                &copy; ${new Date().getFullYear()} SEO Services Inc. <span className="text-gray-200">|</span> Precision Intelligence
+                        <!-- Modals -->
+                        <${SubscriptionModal}
+                            isOpen=${showSubModal}
+                            onClose=${() => setShowSubModal(false)}
+                            onActivateSubscription=${activateSubscription}
+                            paypalSubUrl=${paypalSubUrl}
+                        />
+
+                        <${ReportUnlockModal}
+                            isOpen=${showUnlockModal}
+                            onClose=${() => setShowUnlockModal(false)}
+                            businessName=${activeBusiness}
+                            onUnlockSingle=${unlockSingleReport}
+                            onShowSubscribe=${() => {
+                                setShowUnlockModal(false);
+                                setShowSubModal(true);
+                            }}
+                            paypalDocUrl=${paypalDocUrl}
+                        />
+
+                        <!-- Requested Footer -->
+                        <footer className="no-print pt-20 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 text-gray-500 font-bold text-sm">
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-center md:text-left">
+                                <span>2026 Marketing Management Enterprise LLC</span>
+                                <span className="text-gray-300">|</span>
+                                <span>Google Business Profile Auditor</span>
+                                <span className="text-gray-300">|</span>
+                                <span className="text-gray-600 font-semibold">Powered by Gemini Precision Intelligence</span>
                             </div>
-                            <div className="flex gap-8">
+                            <div className="flex gap-8 text-xs uppercase tracking-widest text-gray-400">
                                 <a href="javascript:void(0)" className="hover:text-gray-900 transition-colors">Privacy</a>
                                 <a href="javascript:void(0)" className="hover:text-gray-900 transition-colors">Terms</a>
                                 <a href="javascript:void(0)" className="hover:text-gray-900 transition-colors">Contact</a>

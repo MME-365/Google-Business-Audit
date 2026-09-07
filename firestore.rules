@@ -13,6 +13,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'customerservice.mme365@gmail.com' ||
+        request.auth.token.email == 'marketingmanagementenp.365@gmail.com' ||
+        (request.auth.token.email_verified == true && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
+      );
+    }
+
     // Lead rules
     match /leads/{leadId} {
       // Users can create their own leads
@@ -21,17 +29,18 @@ service cloud.firestore {
         && request.resource.data.businessName is string
         && request.resource.data.email is string;
       
-      // Users view their own, Admin views ALL
+      // Users view their own, Admins view ALL
       allow list, read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid 
-        || request.auth.token.email == 'customerservice.mme365@gmail.com'
-        || request.auth.token.email_verified == true && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        resource.data.userId == request.auth.uid || isAdmin()
       );
+
+      // Admins can delete/purge leads
+      allow delete: if isAdmin();
     }
     
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if false; // System set only
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
     }
   }
 }

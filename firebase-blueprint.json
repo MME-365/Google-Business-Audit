@@ -17,6 +17,18 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "businessName", "location", "email", "phoneNumber", "timestamp", "overallScore"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User account and subscription status.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "isSubscriber": { "type": "boolean" },
+        "subscriptionPlan": { "type": "string" },
+        "unlockedAudits": { "type": "array" }
+      },
+      "required": ["email"]
     }
   },
   "firestore": {
@@ -24,6 +36,11 @@
       "path": "/leads/{leadId}",
       "schema": "Lead",
       "description": "Collection of all audit leads."
+    },
+    "/users/{userId}": {
+      "path": "/users/{userId}",
+      "schema": "UserProfile",
+      "description": "User subscription and profile data."
     }
   }
 }
