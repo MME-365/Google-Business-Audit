@@ -20,12 +20,14 @@
     },
     "UserProfile": {
       "title": "User Profile",
-      "description": "User account and subscription status.",
+      "description": "User account, subscription plan, and audit credits balance.",
       "type": "object",
       "properties": {
         "email": { "type": "string" },
-        "isSubscriber": { "type": "boolean" },
-        "subscriptionPlan": { "type": "string" },
+        "subscriptionPlan": { "type": "string", "enum": ["free", "pro_49", "agency_249"] },
+        "creditsBalance": { "type": "number" },
+        "auditsUsedThisMonth": { "type": "number" },
+        "auditsUsedThisYear": { "type": "number" },
         "unlockedAudits": { "type": "array" }
       },
       "required": ["email"]
