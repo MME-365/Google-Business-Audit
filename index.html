@@ -58,8 +58,8 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/htm"></script>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest"></script>
+    <script>window.react = window.React;</script>
+    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
     <!-- jsPDF for vector PDF Generation, Preview, and Instant Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
@@ -148,10 +148,11 @@
         // --- ICON HELPER ---
         // The UMD build of lucide-react exposes window.LucideReact
         const getIcon = (name) => {
-            if (window.LucideReact && window.LucideReact[name]) {
-                return window.LucideReact[name];
+            const lib = window.LucideReact || window.lucideReact;
+            if (lib && lib[name]) {
+                return lib[name];
             }
-            // Fallback: Return a simple functional component that renders null or a placeholder
+            // Fallback: Return a simple functional component that renders null
             // to avoid React Error #130 (Element type is invalid)
             return (props) => React.createElement('span', { ...props, 'data-missing-icon': name });
         };
@@ -300,13 +301,13 @@
 
             return html`
                 <div className="space-y-8 animate-fade-in">
-                    <!-- Section Header Pill -->
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                        <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-black uppercase tracking-wider rounded-full shadow-sm">
-                            <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                    <!-- Compact Header Label -->
+                    <div className="flex flex-wrap items-center justify-center gap-2.5">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-200 text-red-700 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
                             Real Google Local Search Intelligence
                         </span>
-                        <span className="text-xs font-bold text-gray-500">
+                        <span className="text-[11px] sm:text-xs font-bold text-gray-500 whitespace-nowrap">
                             Verified Local Search Industry Data
                         </span>
                     </div>
