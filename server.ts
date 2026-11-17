@@ -184,15 +184,25 @@ async function startServer() {
   app.post("/api/email-summary", async (req, res) => {
     const result = req.body?.result;
     const businessName = String(req.body?.businessName || "").trim().slice(0, 160);
+    const tone = String(req.body?.tone || "executive").trim().slice(0, 40);
+    const signature = String(req.body?.signature || "").trim().slice(0, 200);
 
     if (!result || !businessName) {
       return res.status(400).json({ error: "Audit result and business name are required." });
     }
+
+    const toneDirective =
+      tone === "urgent"
+        ? "Direct, persuasive sales outreach tone emphasizing missed calls and immediate 3-Pack revenue opportunity."
+        : tone === "consultative"
+        ? "Warm, helpful, consultative advisor tone."
+        : "Crisp, informative, encouraging executive tone.";
     
     const prompt = `
       Summarize the Google Business Profile audit for "${businessName}" into a concise, professional email body.
-      Tone: Informative and encouraging.
+      Tone: ${toneDirective}
       Format: Plain text with clear headings and bullet points. No markdown.
+      ${signature ? `Close the email with this sender sign-off: "${signature}".` : ""}
       
       Audit Data:
       - Overall Score: ${result.overallScore}/100

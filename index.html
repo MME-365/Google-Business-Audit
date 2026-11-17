@@ -1670,10 +1670,17 @@
                 setIsEmailing(true);
                 setEmailError('');
                 try {
+                    const useSignature = userProfile?.signClientEmails !== false;
+                    const sigParts = [userProfile?.name, userProfile?.agencyName, userProfile?.phoneNumber].filter(Boolean);
                     const response = await fetch(`${API_BASE}/api/email-summary`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ result, businessName })
+                        body: JSON.stringify({
+                            result,
+                            businessName,
+                            tone: userProfile?.emailTone || 'executive',
+                            signature: useSignature ? sigParts.join(' • ') : ''
+                        })
                     });
                     if (!response.ok) throw new Error('Could not generate email summary');
                     const data = await response.json();
@@ -4696,6 +4703,8 @@
             onClearPrefill,
             onAuditLead,
             onSaveScoutedLeads,
+            onLogout,
+            onNotify,
             activeTab = 'run',
             onTabChange
         }) => {
@@ -4707,6 +4716,93 @@
             };
 
             const [historySearch, setHistorySearch] = useState('');
+            const [settingsForm, setSettingsForm] = useState({
+                emailTone: userProfile?.emailTone || 'executive',
+                signClientEmails: userProfile?.signClientEmails !== false,
+                autoFillLocation: userProfile?.autoFillLocation !== false
+            });
+            const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+            useEffect(() => {
+                setSettingsForm({
+                    emailTone: userProfile?.emailTone || 'executive',
+                    signClientEmails: userProfile?.signClientEmails !== false,
+                    autoFillLocation: userProfile?.autoFillLocation !== false
+                });
+            }, [userProfile]);
+
+            const handleSaveSettings = async (e) => {
+                e.preventDefault();
+                setIsSavingSettings(true);
+                try {
+                    await onSaveProfile(settingsForm);
+                    if (onNotify) onNotify('Dashboard settings saved!', 'success');
+                } finally {
+                    setIsSavingSettings(false);
+                }
+            };
+
+            const handleExportAuditsCsv = () => {
+                if (!history.length) {
+                    if (onNotify) onNotify('No audits available to export yet.', 'error');
+                    return;
+                }
+                const headers = ['Business Name', 'Location', 'Niche', 'Overall Score', 'Website', 'Phone', 'Date Run'];
+                const rows = history.map(h => [
+                    `"${(h.businessName || '').replace(/"/g, '""')}"`,
+                    `"${(h.location || '').replace(/"/g, '""')}"`,
+                    `"${(h.niche || '').replace(/"/g, '""')}"`,
+                    h.overallScore || 0,
+                    `"${(h.website || '').replace(/"/g, '""')}"`,
+                    `"${(h.phoneNumber || '').replace(/"/g, '""')}"`,
+                    `"${h.timestamp || ''}"`
+                ]);
+                const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                const a = document.createElement('a');
+                a.href = encodeURI(csv);
+                a.download = `GBP-Audits-${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                if (onNotify) onNotify(`Exported ${history.length} audit(s) to CSV.`, 'success');
+            };
+
+            const handleExportScoutedCsv = () => {
+                if (!userScoutedLeads.length) {
+                    if (onNotify) onNotify('No saved regional leads to export yet.', 'error');
+                    return;
+                }
+                const headers = ['Business Name', 'Niche', 'Location', 'Phone', 'Website', 'Rating', 'Reviews', 'Opportunity Score', 'Gap'];
+                const rows = userScoutedLeads.map(l => [
+                    `"${(l.businessName || '').replace(/"/g, '""')}"`,
+                    `"${(l.niche || '').replace(/"/g, '""')}"`,
+                    `"${(l.location || '').replace(/"/g, '""')}"`,
+                    `"${(l.phoneNumber || '').replace(/"/g, '""')}"`,
+                    `"${(l.website || '').replace(/"/g, '""')}"`,
+                    l.rating || 0,
+                    l.reviewCount || 0,
+                    l.opportunityScore || 0,
+                    `"${(l.googleMapsStatus || '').replace(/"/g, '""')}"`
+                ]);
+                const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                const a = document.createElement('a');
+                a.href = encodeURI(csv);
+                a.download = `GBP-Regional-Prospects-${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                if (onNotify) onNotify(`Exported ${userScoutedLeads.length} saved lead(s) to CSV.`, 'success');
+            };
+
+            const handleClearLocalCache = () => {
+                try {
+                    localStorage.removeItem('gbp_user_profile');
+                    if (user?.uid) {
+                        localStorage.removeItem(`gbp_user_profile_${user.uid}`);
+                    }
+                    if (onNotify) onNotify('Local browser cache cleared. Cloud records in Firestore are untouched.', 'success');
+                } catch (e) {}
+            };
 
             // Calculate quota limits for this 30-day cycle from TIER_CONFIG
             const tier = getTierConfig(plan);
@@ -4788,38 +4884,58 @@
                         `}
                     </div>
 
-                    <!-- Dashboard Tab Navigation (5 Tabs) -->
-                    <div className="flex flex-wrap border-b border-gray-200 gap-2 sm:gap-4">
+                    <!-- Dashboard Tab Navigation (2 Rows x 3 Columns Grid) -->
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3 p-2 bg-white rounded-3xl border border-gray-200 shadow-sm">
                         <button 
+                            type="button"
                             onClick=${() => setDashboardTab('run')}
-                            className=${`pb-3 px-2 text-xs sm:text-sm font-black transition-colors flex items-center gap-2 border-b-2 ${dashboardTab === 'run' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+                            className=${`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 px-2 sm:px-4 py-3 rounded-2xl text-[11px] sm:text-xs font-black text-center sm:text-left leading-tight transition-all cursor-pointer ${dashboardTab === 'run' ? 'bg-red-600 text-white shadow-md shadow-red-200/70' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100'}`}
                         >
-                            <${TargetIcon} size=${16} /> Run Audit
+                            <${TargetIcon} size=${16} className="shrink-0" />
+                            <span>Run Audit</span>
                         </button>
                         <button 
+                            type="button"
                             onClick=${() => setDashboardTab('leads')}
-                            className=${`pb-3 px-2 text-xs sm:text-sm font-black transition-colors flex items-center gap-2 border-b-2 ${dashboardTab === 'leads' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+                            className=${`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 px-2 sm:px-4 py-3 rounded-2xl text-[11px] sm:text-xs font-black text-center sm:text-left leading-tight transition-all cursor-pointer ${dashboardTab === 'leads' ? 'bg-red-600 text-white shadow-md shadow-red-200/70' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100'}`}
                         >
-                            <${CompassIcon} size=${16} /> Fresh Regional Leads
-                            <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] rounded-md font-black">Google</span>
+                            <${CompassIcon} size=${16} className="shrink-0" />
+                            <span className="flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5">
+                                <span>Fresh Regional Leads</span>
+                                <span className=${`px-1.5 py-0.5 text-[9px] rounded-md font-black uppercase leading-none ${dashboardTab === 'leads' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'}`}>Google</span>
+                            </span>
                         </button>
                         <button 
+                            type="button"
                             onClick=${() => setDashboardTab('history')}
-                            className=${`pb-3 px-2 text-xs sm:text-sm font-black transition-colors flex items-center gap-2 border-b-2 ${dashboardTab === 'history' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+                            className=${`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 px-2 sm:px-4 py-3 rounded-2xl text-[11px] sm:text-xs font-black text-center sm:text-left leading-tight transition-all cursor-pointer ${dashboardTab === 'history' ? 'bg-red-600 text-white shadow-md shadow-red-200/70' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100'}`}
                         >
-                            <${FileTextIcon} size=${16} /> Audit History & PDFs (${history.length})
+                            <${FileTextIcon} size=${16} className="shrink-0" />
+                            <span>Audit History & PDFs (${history.length})</span>
                         </button>
                         <button 
+                            type="button"
                             onClick=${() => setDashboardTab('profile')}
-                            className=${`pb-3 px-2 text-xs sm:text-sm font-black transition-colors flex items-center gap-2 border-b-2 ${dashboardTab === 'profile' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+                            className=${`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 px-2 sm:px-4 py-3 rounded-2xl text-[11px] sm:text-xs font-black text-center sm:text-left leading-tight transition-all cursor-pointer ${dashboardTab === 'profile' ? 'bg-red-600 text-white shadow-md shadow-red-200/70' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100'}`}
                         >
-                            <${UserIcon} size=${16} /> My Profile
+                            <${UserIcon} size=${16} className="shrink-0" />
+                            <span>My Profile</span>
                         </button>
                         <button 
+                            type="button"
                             onClick=${() => setDashboardTab('billing')}
-                            className=${`pb-3 px-2 text-xs sm:text-sm font-black transition-colors flex items-center gap-2 border-b-2 ${dashboardTab === 'billing' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-900'}`}
+                            className=${`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 px-2 sm:px-4 py-3 rounded-2xl text-[11px] sm:text-xs font-black text-center sm:text-left leading-tight transition-all cursor-pointer ${dashboardTab === 'billing' ? 'bg-red-600 text-white shadow-md shadow-red-200/70' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100'}`}
                         >
-                            <${CrownIcon} size=${16} /> Subscription & Quota
+                            <${CrownIcon} size=${16} className="shrink-0" />
+                            <span>Subscription & Quota</span>
+                        </button>
+                        <button 
+                            type="button"
+                            onClick=${() => setDashboardTab('settings')}
+                            className=${`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2.5 px-2 sm:px-4 py-3 rounded-2xl text-[11px] sm:text-xs font-black text-center sm:text-left leading-tight transition-all cursor-pointer ${dashboardTab === 'settings' ? 'bg-red-600 text-white shadow-md shadow-red-200/70' : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100'}`}
+                        >
+                            <${SettingsIcon} size=${16} className="shrink-0" />
+                            <span>Settings</span>
                         </button>
                     </div>
 
@@ -4869,7 +4985,7 @@
                                 onAuditLead(lead);
                                 setDashboardTab('run');
                             }}
-                            defaultRegion=${userProfile?.defaultLocation}
+                            defaultRegion=${settingsForm.autoFillLocation ? userProfile?.defaultLocation : ''}
                             onLeadsFound=${onSaveScoutedLeads}
                             plan=${plan}
                             isAdmin=${isAdmin}
@@ -5063,6 +5179,142 @@
                                             className="px-4 py-3.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-900 rounded-xl text-xs font-black cursor-pointer"
                                         >
                                             Activate Plan
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `}
+                    ${dashboardTab === 'settings' && html`
+                        <div className="space-y-8 animate-fade-in">
+                            <!-- Workflow & Outreach Preferences -->
+                            <form onSubmit=${handleSaveSettings} className="p-6 sm:p-8 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                                            <${SettingsIcon} size=${20} className="text-red-600" /> Workspace & Outreach Settings
+                                        </h3>
+                                        <p className="text-xs text-gray-500 mt-0.5">Configure default audit defaults, client email generation, and mobile app installation.</p>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 self-start sm:self-center">
+                                        Synced to Cloud Profile
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                            <${MailIcon} size=${14} className="text-red-600" /> Default Client Email Summary Tone
+                                        </label>
+                                        <select
+                                            value=${settingsForm.emailTone}
+                                            onChange=${(e) => setSettingsForm(prev => ({ ...prev, emailTone: e.target.value }))}
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600"
+                                        >
+                                            <option value="executive">Executive & Encouraging (Balanced)</option>
+                                            <option value="consultative">Friendly & Consultative Advisor</option>
+                                            <option value="urgent">High-Urgency Sales Pitch</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">Automation Toggles</label>
+                                        <label className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl border border-gray-200 cursor-pointer hover:bg-gray-100/70 transition-colors">
+                                            <span className="text-xs font-bold text-gray-800 pr-3">Auto-sign client email drafts with Profile name & phone</span>
+                                            <input
+                                                type="checkbox"
+                                                checked=${settingsForm.signClientEmails}
+                                                onChange=${(e) => setSettingsForm(prev => ({ ...prev, signClientEmails: e.target.checked }))}
+                                                className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                                            />
+                                        </label>
+                                        <label className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl border border-gray-200 cursor-pointer hover:bg-gray-100/70 transition-colors">
+                                            <span className="text-xs font-bold text-gray-800 pr-3">Auto-fill Default Market City in Lead Scout</span>
+                                            <input
+                                                type="checkbox"
+                                                checked=${settingsForm.autoFillLocation}
+                                                onChange=${(e) => setSettingsForm(prev => ({ ...prev, autoFillLocation: e.target.checked }))}
+                                                className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled=${isSavingSettings}
+                                        className="px-6 py-3 bg-gray-900 hover:bg-black text-white rounded-2xl text-xs font-black flex items-center gap-2 shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                    >
+                                        <${CheckIcon} size=${15} /> ${isSavingSettings ? 'Saving Settings...' : 'Save Settings'}
+                                    </button>
+                                </div>
+                            </form>
+
+                            <!-- Native App & Data Controls -->
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Mobile App & Account -->
+                                <div className="p-6 sm:p-8 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-5 flex flex-col justify-between">
+                                    <div className="space-y-3">
+                                        <h4 className="text-base font-black text-gray-900 flex items-center gap-2">
+                                            <${DownloadIcon} size=${18} className="text-red-600" /> Native App & Session
+                                        </h4>
+                                        <p className="text-xs text-gray-500">
+                                            Install GBP Auditor Pro on Android or iOS for full-screen native launch, or manage your active session.
+                                        </p>
+                                        <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-xs flex items-center justify-between gap-2">
+                                            <span className="text-gray-500 font-semibold">Signed-in Google Account</span>
+                                            <span className="font-black text-gray-900 truncate max-w-[190px]">${user?.email || 'Not signed in'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2.5 pt-2">
+                                        <${PWAInstallButton} variant="menu" />
+                                        ${onLogout && html`
+                                            <button
+                                                type="button"
+                                                onClick=${onLogout}
+                                                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                                            >
+                                                <${LogOutIcon} size=${15} /> Sign Out of Account
+                                            </button>
+                                        `}
+                                    </div>
+                                </div>
+
+                                <!-- Exports & Cache -->
+                                <div className="p-6 sm:p-8 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-5 flex flex-col justify-between">
+                                    <div className="space-y-2">
+                                        <h4 className="text-base font-black text-gray-900 flex items-center gap-2">
+                                            <${FileTextIcon} size=${18} className="text-red-600" /> Data Export & Browser Cache
+                                        </h4>
+                                        <p className="text-xs text-gray-500">
+                                            Download CSV backups of your audits and saved regional prospects anytime, or clear local browser cache.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2.5 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick=${handleExportAuditsCsv}
+                                            className="w-full py-3 px-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl text-xs font-black text-gray-800 flex items-center justify-between cursor-pointer"
+                                        >
+                                            <span>Export Audit History CSV (${history.length})</span>
+                                            <${DownloadIcon} size=${15} className="text-gray-500" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick=${handleExportScoutedCsv}
+                                            className="w-full py-3 px-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl text-xs font-black text-gray-800 flex items-center justify-between cursor-pointer"
+                                        >
+                                            <span>Export Saved Regional Prospects CSV (${userScoutedLeads.length})</span>
+                                            <${DownloadIcon} size=${15} className="text-gray-500" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick=${handleClearLocalCache}
+                                            className="w-full py-3 px-4 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-2xl text-xs font-black text-amber-900 flex items-center justify-between cursor-pointer"
+                                        >
+                                            <span>Clear Local Browser Cache</span>
+                                            <${RefreshIcon} size=${15} className="text-amber-700" />
                                         </button>
                                     </div>
                                 </div>
@@ -6108,6 +6360,8 @@
                                         setActiveDashboardTab('run');
                                     }}
                                     onSaveScoutedLeads=${handleSaveScoutedLeads}
+                                    onLogout=${logout}
+                                    onNotify=${showToast}
                                     activeTab=${activeDashboardTab}
                                     onTabChange=${(tab) => setActiveDashboardTab(tab)}
                                 />
