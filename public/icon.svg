@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="50%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f1526"/>
+      <stop offset="100%" stop-color="#080c16"/>
+    </linearGradient>
+    <linearGradient id="pinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="55%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#bgGrad)"/>
+  <rect x="52" y="52" width="408" height="408" rx="96" fill="none" stroke="url(#brandGrad)" stroke-width="18"/>
+
+  <!-- Minimalist Map Pin + Checkmark Spark -->
+  <path d="M256 108c-36 0-65 28.5-65 63.8 0 43.8 54 94.2 60 99.6a7.5 7.5 0 0 0 10 0c6-5.4 60-55.8 60-99.6 0-35.3-29-63.8-65-63.8z" fill="url(#pinGrad)"/>
+  <circle cx="256" cy="170" r="34" fill="#080c16"/>
+  <path d="M238 171l12 12 26-28" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Bold Monogram GBP -->
+  <text x="256" y="380" text-anchor="middle" font-family="Inter, Arial Black, sans-serif" font-weight="900" font-size="112" letter-spacing="4" fill="#ffffff">GBP</text>
+</svg>

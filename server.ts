@@ -95,7 +95,11 @@ async function startServer() {
 
   // API Route: Audit
   app.post("/api/audit", async (req, res) => {
-    const { businessName, location, phoneNumber, website, niche } = req.body;
+    const businessName = String(req.body?.businessName || "").trim().slice(0, 160);
+    const location = String(req.body?.location || "").trim().slice(0, 160);
+    const phoneNumber = String(req.body?.phoneNumber || "").trim().slice(0, 40);
+    const website = String(req.body?.website || "").trim().slice(0, 200);
+    const niche = String(req.body?.niche || "").trim().slice(0, 120);
     
     if (!businessName || !location) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -135,7 +139,8 @@ async function startServer() {
 
   // API Route: Fresh Regional Leads Finder
   app.post("/api/find-regional-leads", async (req, res) => {
-    const { niche, region } = req.body;
+    const niche = String(req.body?.niche || "").trim().slice(0, 120);
+    const region = String(req.body?.region || "").trim().slice(0, 160);
     
     if (!niche || !region) {
       return res.status(400).json({ error: "Niche and region are required." });
@@ -177,7 +182,12 @@ async function startServer() {
 
   // API Route: Email Summary
   app.post("/api/email-summary", async (req, res) => {
-    const { result, businessName } = req.body;
+    const result = req.body?.result;
+    const businessName = String(req.body?.businessName || "").trim().slice(0, 160);
+
+    if (!result || !businessName) {
+      return res.status(400).json({ error: "Audit result and business name are required." });
+    }
     
     const prompt = `
       Summarize the Google Business Profile audit for "${businessName}" into a concise, professional email body.

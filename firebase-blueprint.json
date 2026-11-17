@@ -26,6 +26,9 @@
         "email": { "type": "string" },
         "subscriptionPlan": { "type": "string", "enum": ["free", "pro_49", "agency_249"] },
         "creditsBalance": { "type": "number" },
+        "cycleStart": { "type": "number" },
+        "leadScoutsUsedInCycle": { "type": "number" },
+        "lastPaymentRef": { "type": "string" },
         "auditsUsedThisMonth": { "type": "number" },
         "auditsUsedThisYear": { "type": "number" },
         "unlockedAudits": { "type": "array" }
@@ -39,10 +42,20 @@
       "schema": "Lead",
       "description": "Collection of all audit leads."
     },
+    "/audits/{auditId}": {
+      "path": "/audits/{auditId}",
+      "schema": "Lead",
+      "description": "Master collection of completed business audits."
+    },
+    "/scouted_leads/{leadId}": {
+      "path": "/scouted_leads/{leadId}",
+      "schema": "Lead",
+      "description": "Regional Google Maps prospects scouted by users."
+    },
     "/users/{userId}": {
       "path": "/users/{userId}",
       "schema": "UserProfile",
-      "description": "User subscription and profile data."
+      "description": "User subscription, quota cycle, and profile data."
     }
   }
 }

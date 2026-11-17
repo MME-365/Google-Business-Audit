@@ -2,11 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Business Profile Auditor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>GBP Auditor Pro — Google Business Profile Auditor</title>
     <meta name="description" content="An AI-powered Google Business Profile audit tool with Google authentication and centralized lead tracking for admins.">
-    <meta property="og:title" content="Google Business Profile Auditor">
+    <meta property="og:title" content="GBP Auditor Pro — Google Business Profile Auditor">
     <meta property="og:description" content="An AI-powered Google Business Profile audit tool with Google authentication and centralized lead tracking for admins.">
+    <meta name="theme-color" content="#080c16">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GBP Auditor">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     
     <script>
         // Infrastructure Shield: Suppress noise from browser extensions (MetaMask, Wallet, etc.)
@@ -202,6 +211,40 @@
         const ActivityIcon = getIcon('Activity');
         const UserCheckIcon = getIcon('UserCheck');
         const FilterIcon = getIcon('Filter');
+        const CopyIcon = getIcon('Copy');
+
+        const TIER_CONFIG = {
+            free: {
+                id: 'free',
+                name: 'Free Starter',
+                price: 0,
+                auditsPerCycle: 1,
+                maxAuditsPerYear: 6,
+                leadScoutsPerCycle: 1,
+                whiteLabelPdf: false
+            },
+            pro_49: {
+                id: 'pro_49',
+                name: 'Growth Pro',
+                price: 49,
+                auditsPerCycle: 100,
+                maxAuditsPerYear: null,
+                leadScoutsPerCycle: 30,
+                whiteLabelPdf: true
+            },
+            agency_249: {
+                id: 'agency_249',
+                name: 'Scale Agency',
+                price: 249,
+                auditsPerCycle: 700,
+                maxAuditsPerYear: null,
+                leadScoutsPerCycle: 200,
+                whiteLabelPdf: true
+            }
+        };
+
+        const getTierConfig = (planId) => TIER_CONFIG[planId] || TIER_CONFIG.free;
+
         const GoogleIcon = (props) => html`
             <svg ...props viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -210,6 +253,182 @@
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.15l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
         `;
+
+        // --- PWA HOOKS & INSTALL UI ---
+        const usePWAInstall = () => {
+            const [deferredPrompt, setDeferredPrompt] = useState(null);
+            const [isInstalled, setIsInstalled] = useState(false);
+            const [isIOS, setIsIOS] = useState(false);
+            const [isAndroid, setIsAndroid] = useState(false);
+
+            useEffect(() => {
+                const isStandalone =
+                    window.matchMedia('(display-mode: standalone)').matches ||
+                    window.navigator.standalone === true;
+                setIsInstalled(isStandalone);
+
+                const ua = window.navigator.userAgent.toLowerCase();
+                setIsIOS(/iphone|ipad|ipod/.test(ua));
+                setIsAndroid(/android/.test(ua));
+
+                const handleBeforeInstallPrompt = (e) => {
+                    e.preventDefault();
+                    setDeferredPrompt(e);
+                };
+
+                const handleAppInstalled = () => {
+                    setIsInstalled(true);
+                    setDeferredPrompt(null);
+                };
+
+                window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+                window.addEventListener('appinstalled', handleAppInstalled);
+                return () => {
+                    window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+                    window.removeEventListener('appinstalled', handleAppInstalled);
+                };
+            }, []);
+
+            const install = async () => {
+                if (!deferredPrompt) return false;
+                await deferredPrompt.prompt();
+                const choice = await deferredPrompt.userChoice;
+                if (choice?.outcome === 'accepted') {
+                    setIsInstalled(true);
+                    setDeferredPrompt(null);
+                    return true;
+                }
+                return false;
+            };
+
+            return {
+                isInstallable: Boolean(deferredPrompt),
+                isInstalled,
+                isIOS,
+                isAndroid,
+                install
+            };
+        };
+
+        const useOnlineStatus = () => {
+            const [isOnline, setIsOnline] = useState(
+                typeof navigator !== 'undefined' ? navigator.onLine : true
+            );
+            useEffect(() => {
+                const onOnline = () => setIsOnline(true);
+                const onOffline = () => setIsOnline(false);
+                window.addEventListener('online', onOnline);
+                window.addEventListener('offline', onOffline);
+                return () => {
+                    window.removeEventListener('online', onOnline);
+                    window.removeEventListener('offline', onOffline);
+                };
+            }, []);
+            return isOnline;
+        };
+
+        const PWAInstallButton = ({ variant = 'header', onAfterClick }) => {
+            const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
+            const [showGuideModal, setShowGuideModal] = useState(false);
+
+            if (isInstalled) return null;
+
+            const handleAction = async () => {
+                if (isInstallable) {
+                    await install();
+                    if (onAfterClick) onAfterClick();
+                } else {
+                    setShowGuideModal(true);
+                }
+            };
+
+            // Only show in header when native prompt is ready, or on mobile (Android/iOS), or always inside menu
+            if (variant === 'header' && !isInstallable && !isIOS && !isAndroid) {
+                return null;
+            }
+
+            return html`
+                ${variant === 'menu' ? html`
+                    <button
+                        type="button"
+                        onClick=${handleAction}
+                        className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#11192d] hover:bg-[#18233d] text-emerald-200 border border-emerald-500/40 transition-all cursor-pointer"
+                    >
+                        <span className="flex items-center gap-2.5">
+                            <${DownloadIcon} size=${16} className="text-emerald-400" />
+                            <span>${isInstallable ? 'Install Native App' : isIOS ? 'Install on iPhone / iPad' : 'Install Android / Desktop App'}</span>
+                        </span>
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-700/50">App</span>
+                    </button>
+                ` : html`
+                    <button
+                        type="button"
+                        onClick=${handleAction}
+                        className="px-3 py-2 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                        title="Install GBP Auditor Pro App"
+                    >
+                        <${DownloadIcon} size=${14} />
+                        <span className="hidden xs:inline">Install App</span>
+                    </button>
+                `}
+
+                ${showGuideModal && html`
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white text-gray-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <img src="/pwa-192x192.png" alt="GBP Auditor Pro" className="w-11 h-11 rounded-2xl shadow-sm" />
+                                    <div>
+                                        <h3 className="text-base font-black text-gray-900">Install GBP Auditor Pro</h3>
+                                        <p className="text-[11px] font-semibold text-gray-500">Launch full-screen like a native app</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick=${() => setShowGuideModal(false)}
+                                    className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 cursor-pointer"
+                                >
+                                    <${XIcon} size=${18} />
+                                </button>
+                            </div>
+                            ${isIOS ? html`
+                                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-700 space-y-2 leading-relaxed">
+                                    <p className="font-bold text-gray-900">Install on iPhone / iPad (Safari):</p>
+                                    <p>1. Tap the <strong>Share</strong> icon in Safari's toolbar.</p>
+                                    <p>2. Scroll down and tap <strong>Add to Home Screen</strong>.</p>
+                                    <p>3. Tap <strong>Add</strong> to launch GBP Auditor Pro full-screen.</p>
+                                </div>
+                            ` : html`
+                                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-700 space-y-2 leading-relaxed">
+                                    <p className="font-bold text-gray-900">Install on Android / Chrome:</p>
+                                    <p>1. Open this app directly in Chrome (not inside an embedded preview frame).</p>
+                                    <p>2. Tap Chrome's <strong>⋮ menu</strong> (or install icon in the address bar).</p>
+                                    <p>3. Tap <strong>Install app</strong> / <strong>Add to Home screen</strong> for native full-screen launch.</p>
+                                </div>
+                            `}
+                            <button
+                                type="button"
+                                onClick=${() => setShowGuideModal(false)}
+                                className="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-2xl text-xs font-black cursor-pointer"
+                            >
+                                Got It
+                            </button>
+                        </div>
+                    </div>
+                `}
+            `;
+        };
+
+        const OfflineIndicator = () => {
+            const isOnline = useOnlineStatus();
+            if (isOnline) return null;
+            return html`
+                <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-2xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg border border-amber-400">
+                    <span className="h-2 w-2 rounded-full bg-white animate-pulse"></span>
+                    Offline Mode — Cached app shell active
+                </div>
+            `;
+        };
 
         // --- COMPONENTS ---
 
@@ -454,7 +673,7 @@
             </div>
         `;
 
-        const ServiceCard = ({ title, description, price, iconType }) => html`
+        const ServiceCard = ({ title, description, price, iconType, onOrder }) => html`
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col h-full group">
                 <div className="flex items-center space-x-4 mb-6">
                     <div className="p-3 bg-red-50 rounded-2xl text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors">
@@ -468,7 +687,11 @@
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Starts at</span>
                         <span className="text-3xl font-black text-gray-900">$${price}</span>
                     </div>
-                    <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 active:scale-95">
+                    <button 
+                        type="button"
+                        onClick=${() => onOrder && onOrder({ title, description, price })}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                    >
                         Order <${ExternalLinkIcon} size=${18} />
                     </button>
                 </div>
@@ -534,6 +757,9 @@
         }) => {
             if (!isOpen) return null;
             const [activeTab, setActiveTab] = useState('subscriptions'); // 'subscriptions' | 'credits'
+            const [pendingActivationId, setPendingActivationId] = useState(null);
+            const [paymentRefInput, setPaymentRefInput] = useState('');
+            const [refError, setRefError] = useState('');
 
             const subscriptionTiers = [
                 {
@@ -541,8 +767,8 @@
                     name: 'Free Starter',
                     price: 0,
                     period: 'free forever',
-                    auditLimit: '1 audit / month',
-                    subLimit: 'Max 6 audits / year',
+                    auditLimit: '1 audit / month • 1 lead scout / mo',
+                    subLimit: 'Max 6 audits / calendar year',
                     badge: 'Zero Risk',
                     accent: 'border-gray-200 text-gray-700',
                     bg: 'bg-white',
@@ -550,10 +776,10 @@
                     features: [
                         '1 deep Google Business Profile scan per month',
                         'Up to 6 full scans per calendar year',
-                        '6-Pillar local ranking signal breakdown',
-                        'Actionable step-by-step optimization roadmap',
-                        '2-Page vector PDF report preview & instant download',
-                        'Executive email summary'
+                        '1 Regional Lead Scout search per month',
+                        '6-Pillar breakdown & step-by-step roadmap',
+                        '2-Page vector PDF report (GBP Auditor Pro branding)',
+                        'Executive email summary generator'
                     ],
                     isCurrent: currentPlan === 'free'
                 },
@@ -562,7 +788,7 @@
                     name: 'Growth Pro',
                     price: 49,
                     period: '/ month',
-                    auditLimit: '100 audits / month',
+                    auditLimit: '100 audits / mo • 30 lead scouts / mo',
                     subLimit: '$0.49 per generated audit',
                     badge: 'Most Popular',
                     accent: 'border-red-500 shadow-red-100 ring-2 ring-red-500',
@@ -570,12 +796,11 @@
                     btnColor: 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200',
                     paypalUrl: paypalUrls.plan_pro_49,
                     features: [
-                        '100 profile audits every month ($0.49/audit)',
-                        'Instant 2-Page high-resolution vector PDF downloads',
-                        'Executive client email reporting summaries',
-                        'Google 3-Pack benchmark & competitor gap analysis',
-                        'Persistent lead tracking in central vault',
-                        'Priority Gemini Precision AI processing queue',
+                        '100 profile audits every 30 days ($0.49/audit)',
+                        '30 Regional Lead Scout searches / 30 days (~200 leads)',
+                        'White-label PDF branding (Agency Name & Custom Footer)',
+                        'Executive client email summaries (copy & mailto)',
+                        'Persistent audit & scouted lead vault in Firestore',
                         'Cancel anytime in PayPal'
                     ],
                     isCurrent: currentPlan === 'pro_49'
@@ -585,7 +810,7 @@
                     name: 'Scale Agency',
                     price: 249,
                     period: '/ month',
-                    auditLimit: '700 audits / month',
+                    auditLimit: '700 audits / mo • 200 lead scouts / mo',
                     subLimit: '~$0.35 per generated audit',
                     badge: 'Ultimate Value & Scale',
                     accent: 'border-amber-400 shadow-amber-100 ring-2 ring-amber-400',
@@ -593,12 +818,11 @@
                     btnColor: 'bg-amber-400 hover:bg-amber-300 text-amber-950 font-black shadow-lg shadow-amber-900/40',
                     paypalUrl: paypalUrls.plan_agency_249,
                     features: [
-                        '700 profile audits every month (~$0.35/audit)',
-                        'Engineered for agency prospecting & cold outreach',
-                        'Unlimited 2-page vector PDF client reports',
-                        'Automated email summaries ready to forward to prospects',
-                        'Full central lead storage & audit history',
-                        'Dedicated highest-tier Gemini AI queue',
+                        '700 profile audits every 30 days (~$0.35/audit)',
+                        '200 Regional Lead Scout searches / 30 days (~1,500 leads)',
+                        'Full White-Label Agency PDF branding & custom notes',
+                        'Automated email summaries ready for client outreach',
+                        'Full central lead storage, CSV export & audit history',
                         'Cancel anytime in PayPal'
                     ],
                     isCurrent: currentPlan === 'agency_249'
@@ -761,12 +985,66 @@
                                                     >
                                                         <${CreditCardIcon} size=${15} /> Subscribe via PayPal ($${tier.price}/mo)
                                                     </a>
-                                                    <button 
-                                                        onClick=${() => onSelectPlan(tier.id)}
-                                                        className=${`w-full py-2.5 rounded-xl font-bold text-[11px] border transition-all ${tier.id === 'agency_249' ? 'bg-white/10 hover:bg-white/20 border-white/20 text-white' : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'}`}
-                                                    >
-                                                        ${tier.isCurrent ? 'Currently Active' : "I've Subscribed (Activate Plan)"}
-                                                    </button>
+                                                    ${!tier.isCurrent && (pendingActivationId === tier.id ? html`
+                                                        <div className="p-3 rounded-xl bg-white/95 border border-gray-200 text-gray-900 space-y-2 text-left">
+                                                            <label className="block text-[10px] font-black uppercase tracking-wider text-gray-600">
+                                                                PayPal Transaction / Receipt ID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value=${paymentRefInput}
+                                                                onChange=${(e) => { setPaymentRefInput(e.target.value); setRefError(''); }}
+                                                                placeholder="e.g. 8AB12345CD678901E"
+                                                                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono outline-none focus:border-red-600"
+                                                            />
+                                                            ${refError && html`<p className="text-[10px] text-red-600 font-bold">${refError}</p>`}
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick=${() => {
+                                                                        const trimmed = paymentRefInput.trim();
+                                                                        if (!isAdmin && trimmed.length < 6) {
+                                                                            setRefError('Enter your PayPal Transaction ID (min 6 chars).');
+                                                                            return;
+                                                                        }
+                                                                        onSelectPlan(tier.id, trimmed || 'ADMIN_OVERRIDE');
+                                                                        setPendingActivationId(null);
+                                                                        setPaymentRefInput('');
+                                                                    }}
+                                                                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black cursor-pointer"
+                                                                >
+                                                                    Confirm & Activate
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick=${() => { setPendingActivationId(null); setRefError(''); }}
+                                                                    className="px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-[11px] font-bold cursor-pointer"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ` : html`
+                                                        <button 
+                                                            onClick=${() => {
+                                                                if (isAdmin) {
+                                                                    onSelectPlan(tier.id, 'ADMIN_OVERRIDE');
+                                                                } else {
+                                                                    setPendingActivationId(tier.id);
+                                                                    setPaymentRefInput('');
+                                                                    setRefError('');
+                                                                }
+                                                            }}
+                                                            className=${`w-full py-2.5 rounded-xl font-bold text-[11px] border transition-all cursor-pointer ${tier.id === 'agency_249' ? 'bg-white/10 hover:bg-white/20 border-white/20 text-white' : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'}`}
+                                                        >
+                                                            ${isAdmin ? 'Admin: Instant Activate' : "I've Subscribed (Enter PayPal ID)"}
+                                                        </button>
+                                                    `)}
+                                                    ${tier.isCurrent && html`
+                                                        <div className=${`w-full py-2 rounded-xl font-bold text-[11px] text-center ${tier.id === 'agency_249' ? 'text-amber-300' : 'text-emerald-700'}`}>
+                                                            Currently Active
+                                                        </div>
+                                                    `}
                                                 `}
                                             </div>
                                         </div>
@@ -841,12 +1119,61 @@
                                                     >
                                                         <${CreditCardIcon} size=${15} /> Buy for $${pack.price} via PayPal
                                                     </a>
-                                                    <button 
-                                                        onClick=${() => onAddCredits(pack.credits, pack.title)}
-                                                        className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-[11px] border border-gray-200 transition-all"
-                                                    >
-                                                        I've Paid (Add +${pack.credits} Credits)
-                                                    </button>
+                                                    ${pendingActivationId === pack.id ? html`
+                                                        <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 space-y-2 text-left">
+                                                            <label className="block text-[10px] font-black uppercase tracking-wider text-gray-600">
+                                                                PayPal Transaction / Receipt ID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value=${paymentRefInput}
+                                                                onChange=${(e) => { setPaymentRefInput(e.target.value); setRefError(''); }}
+                                                                placeholder="e.g. 8AB12345CD678901E"
+                                                                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-mono outline-none focus:border-emerald-600"
+                                                            />
+                                                            ${refError && html`<p className="text-[10px] text-red-600 font-bold">${refError}</p>`}
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick=${() => {
+                                                                        const trimmed = paymentRefInput.trim();
+                                                                        if (!isAdmin && trimmed.length < 6) {
+                                                                            setRefError('Enter your PayPal Transaction ID (min 6 chars).');
+                                                                            return;
+                                                                        }
+                                                                        onAddCredits(pack.credits, pack.title, trimmed || 'ADMIN_OVERRIDE');
+                                                                        setPendingActivationId(null);
+                                                                        setPaymentRefInput('');
+                                                                    }}
+                                                                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black cursor-pointer"
+                                                                >
+                                                                    Add +${pack.credits} Credits
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick=${() => { setPendingActivationId(null); setRefError(''); }}
+                                                                    className="px-2.5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ` : html`
+                                                        <button 
+                                                            onClick=${() => {
+                                                                if (isAdmin) {
+                                                                    onAddCredits(pack.credits, pack.title, 'ADMIN_OVERRIDE');
+                                                                } else {
+                                                                    setPendingActivationId(pack.id);
+                                                                    setPaymentRefInput('');
+                                                                    setRefError('');
+                                                                }
+                                                            }}
+                                                            className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-[11px] border border-gray-200 transition-all cursor-pointer"
+                                                        >
+                                                            ${isAdmin ? `Admin: Instant +${pack.credits} Credits` : `I've Paid (Enter PayPal ID)`}
+                                                        </button>
+                                                    `}
                                                 </div>
                                             </div>
                                         `)}
@@ -867,7 +1194,7 @@
         };
 
         // --- VECTOR PDF GENERATION ENGINE ---
-        const generateAuditPDF = ({ result, businessName, businessDetails, userProfile }) => {
+        const generateAuditPDF = ({ result, businessName, businessDetails, userProfile, isWhiteLabelAllowed = true }) => {
             if (!window.jspdf || !window.jspdf.jsPDF) {
                 console.warn("jsPDF is not loaded yet");
                 return null;
@@ -901,6 +1228,7 @@
             };
 
             const scoreColor = getScoreColor(score);
+            const activeAgencyName = isWhiteLabelAllowed && userProfile?.agencyName ? userProfile.agencyName.trim() : '';
 
             // ================= PAGE 1: EXECUTIVE AUDIT REPORT =================
             // 1. Top Header Banner
@@ -912,7 +1240,7 @@
             doc.rect(0, 70, pageWidth, 2.5, 'F');
 
             // Header Titles
-            const brandTitle = userProfile?.agencyName ? userProfile.agencyName.toUpperCase() : "GBP AUDITOR PRO";
+            const brandTitle = activeAgencyName ? activeAgencyName.toUpperCase() : "GBP AUDITOR PRO";
             doc.setTextColor(255, 255, 255);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(15);
@@ -921,7 +1249,7 @@
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(8);
             doc.setTextColor(248, 113, 113); // #f87171
-            doc.text(userProfile?.agencyName ? "AUTHORIZED LOCAL SEARCH & REPUTATION REPORT" : "GOOGLE BUSINESS PROFILE AUDIT & REVENUE REPORT", margin, 46);
+            doc.text(activeAgencyName ? "AUTHORIZED LOCAL SEARCH & REPUTATION REPORT" : "GOOGLE BUSINESS PROFILE AUDIT & REVENUE REPORT", margin, 46);
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(8.5);
@@ -1169,15 +1497,15 @@
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(8.5);
             doc.setTextColor(153, 27, 27); // #991b1b red-800
-            const nextStepsTitle = userProfile?.agencyName 
-                ? `ACTION ROADMAP • PREPARED BY ${userProfile.agencyName.toUpperCase()}`
+            const nextStepsTitle = activeAgencyName
+                ? `ACTION ROADMAP • PREPARED BY ${activeAgencyName.toUpperCase()}`
                 : "NEXT STEPS: LOCAL 3-PACK IMPLEMENTATION";
             doc.text(nextStepsTitle, margin + 12, pageHeight - 92);
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7.5);
             doc.setTextColor(185, 28, 28);
-            const actionText = userProfile?.customPdfNotes || 
+            const actionText = (isWhiteLabelAllowed && userProfile?.customPdfNotes) || 
                 "Execute these roadmap recommendations over the next 14-30 days to signal Google algorithms and secure your top 3-Pack placement. For managed execution, review our professional SEO packages.";
             doc.text(
                 actionText,
@@ -1193,8 +1521,8 @@
             doc.setDrawColor(229, 231, 235);
             doc.line(margin, pageHeight - 30, pageWidth - margin, pageHeight - 30);
             
-            const agencyFooterLine = userProfile?.agencyName
-                ? `Audited by ${userProfile.agencyName}${userProfile.phoneNumber ? ' • ' + userProfile.phoneNumber : ''}${userProfile.website ? ' • ' + userProfile.website : ''}`
+            const agencyFooterLine = activeAgencyName
+                ? `Audited by ${activeAgencyName}${userProfile?.phoneNumber ? ' • ' + userProfile.phoneNumber : ''}${userProfile?.website ? ' • ' + userProfile.website : ''}`
                 : `Google Business Profile Audit Report • Generated for ${business}`;
             doc.text(agencyFooterLine, margin, pageHeight - 18);
             doc.text("Page 2 of 2", pageWidth - margin, pageHeight - 18, { align: 'right' });
@@ -1276,13 +1604,18 @@
             `;
         };
 
-        const AuditResultView = ({ result, businessName, businessDetails, onReset, isAdmin, plan, credits, onOpenPricing, userProfile }) => {
+        const AuditResultView = ({ result, businessName, businessDetails, onReset, isAdmin, plan, credits, onOpenPricing, userProfile, onOrderService }) => {
             const [pdfData, setPdfData] = useState(null);
             const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
             const [showPdfPreview, setShowPdfPreview] = useState(false);
             const [downloadSuccess, setDownloadSuccess] = useState(false);
             const [isEmailing, setIsEmailing] = useState(false);
             const [emailSent, setEmailSent] = useState(false);
+            const [emailSummaryText, setEmailSummaryText] = useState('');
+            const [emailError, setEmailError] = useState('');
+            const [copiedEmail, setCopiedEmail] = useState(false);
+
+            const isWhiteLabelAllowed = isAdmin || getTierConfig(plan).whiteLabelPdf;
 
             // Automatically compile the vector PDF from the audited data without triggering an immediate download
             useEffect(() => {
@@ -1290,7 +1623,7 @@
                 setIsGeneratingPdf(true);
                 try {
                     const timer = setTimeout(() => {
-                        const generated = generateAuditPDF({ result, businessName, businessDetails, userProfile });
+                        const generated = generateAuditPDF({ result, businessName, businessDetails, userProfile, isWhiteLabelAllowed });
                         if (generated) {
                             setPdfData(generated);
                         }
@@ -1301,14 +1634,14 @@
                     console.error("PDF generation failed:", err);
                     setIsGeneratingPdf(false);
                 }
-            }, [result, businessName, businessDetails, userProfile]);
+            }, [result, businessName, businessDetails, userProfile, isWhiteLabelAllowed]);
 
             const handleDownloadPdf = () => {
                 try {
                     if (pdfData && pdfData.download) {
                         pdfData.download();
                     } else {
-                        const generated = generateAuditPDF({ result, businessName, businessDetails, userProfile });
+                        const generated = generateAuditPDF({ result, businessName, businessDetails, userProfile, isWhiteLabelAllowed });
                         if (generated) {
                             setPdfData(generated);
                             generated.download();
@@ -1323,7 +1656,7 @@
 
             const handlePreviewPdf = () => {
                 if (!pdfData) {
-                    const generated = generateAuditPDF({ result, businessName, businessDetails, userProfile });
+                    const generated = generateAuditPDF({ result, businessName, businessDetails, userProfile, isWhiteLabelAllowed });
                     if (generated) setPdfData(generated);
                 }
                 setShowPdfPreview(true);
@@ -1335,17 +1668,33 @@
 
             const handleEmailSummary = async () => {
                 setIsEmailing(true);
+                setEmailError('');
                 try {
                     const response = await fetch(`${API_BASE}/api/email-summary`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ result, businessName })
                     });
-                    if (response.ok) setEmailSent(true);
+                    if (!response.ok) throw new Error('Could not generate email summary');
+                    const data = await response.json();
+                    setEmailSummaryText(data.text || '');
+                    setEmailSent(true);
                 } catch (err) {
                     console.error("Email failed", err);
+                    setEmailError('Unable to generate email summary right now. Please try again.');
                 } finally {
                     setIsEmailing(false);
+                }
+            };
+
+            const handleCopyEmailSummary = async () => {
+                if (!emailSummaryText) return;
+                try {
+                    await navigator.clipboard.writeText(emailSummaryText);
+                    setCopiedEmail(true);
+                    setTimeout(() => setCopiedEmail(false), 2500);
+                } catch (e) {
+                    console.warn("Clipboard write failed", e);
                 }
             };
 
@@ -1465,10 +1814,10 @@
                             </button>
                             <button 
                                 onClick=${handleEmailSummary}
-                                disabled=${isEmailing || emailSent}
+                                disabled=${isEmailing}
                                 className=${`px-7 py-4 rounded-2xl font-black flex items-center gap-3 transition-all active:scale-95 border shadow-lg ${emailSent ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white border-red-400/30 hover:bg-red-500'}`}
                             >
-                                <${MailIcon} size=${20} /> ${emailSent ? 'Summary Sent!' : isEmailing ? 'Preparing...' : 'Email Summary'}
+                                <${MailIcon} size=${20} /> ${isEmailing ? 'Drafting...' : emailSent ? 'Email Draft Ready' : 'Email Summary'}
                             </button>
                             <button 
                                 onClick=${onOpenPricing}
@@ -1490,6 +1839,39 @@
                                 <${RefreshIcon} size=${20} /> New Audit
                             </button>
                         </div>
+
+                        ${emailError && html`
+                            <div className="p-3 bg-red-900/60 border border-red-400/40 rounded-2xl text-xs font-bold text-red-100 max-w-xl mx-auto">
+                                ${emailError}
+                            </div>
+                        `}
+
+                        ${emailSummaryText && html`
+                            <div className="text-left bg-white text-gray-900 rounded-3xl p-6 sm:p-8 shadow-xl space-y-4 border border-red-200 relative">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                                    <div>
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-red-600">Executive Client Email Draft</span>
+                                        <h4 className="text-base font-black text-gray-900">GBP Audit Summary — ${businessName}</h4>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick=${handleCopyEmailSummary}
+                                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer"
+                                        >
+                                            <${CopyIcon} size=${14} /> ${copiedEmail ? 'Copied!' : 'Copy Email Text'}
+                                        </button>
+                                        <a
+                                            href=${`mailto:?subject=${encodeURIComponent(`Google Business Profile Audit: ${businessName} (${result.overallScore}/100)`)}&body=${encodeURIComponent(emailSummaryText)}`}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-colors shadow-sm"
+                                        >
+                                            <${MailIcon} size=${14} /> Open in Mail App
+                                        </a>
+                                    </div>
+                                </div>
+                                <pre className="whitespace-pre-wrap font-sans text-xs sm:text-sm text-gray-700 leading-relaxed max-h-80 overflow-y-auto bg-gray-50 p-4 rounded-2xl border border-gray-200">${emailSummaryText}</pre>
+                            </div>
+                        `}
                     </div>
 
                     <!-- PDF Preview Modal -->
@@ -1514,18 +1896,21 @@
                                 description="High-tier backlink acquisition strategies focused on Domain Authority (DA) and Page Authority (PA) growth."
                                 price=${299}
                                 iconType=${RocketIcon}
+                                onOrder=${onOrderService}
                             />
                             <${ServiceCard} 
                                 title="Local 3-Pack Push"
                                 description="Aggressive citation building and map signal optimization to secure your place in the top local results."
                                 price=${149}
                                 iconType=${TargetIcon}
+                                onOrder=${onOrderService}
                             />
                             <${ServiceCard} 
                                 title="Moz Metrics Audit"
                                 description="In-depth analysis of Moz Trust and Spam scores with a direct plan to improve your organic footprint."
                                 price=${199}
                                 iconType=${BarChartIcon}
+                                onOrder=${onOrderService}
                             />
                         </div>
                     </div>
@@ -1728,8 +2113,10 @@
             userProfile,
             onSaveProfile,
             plan,
+            isAdmin,
             credits,
             auditsThisCycle,
+            leadScoutsUsedInCycle = 0,
             cycleDaysLeft,
             cycleEndDate,
             onOpenPricing
@@ -1744,6 +2131,9 @@
             });
             const [isSaving, setIsSaving] = useState(false);
             const [saveSuccess, setSaveSuccess] = useState(false);
+
+            const tier = getTierConfig(plan);
+            const isWhiteLabelAllowed = isAdmin || tier.whiteLabelPdf;
 
             useEffect(() => {
                 if (userProfile) {
@@ -1775,7 +2165,7 @@
                 }
             };
 
-            const cycleLimit = plan === 'agency_249' ? 700 : plan === 'pro_49' ? 100 : 1;
+            const cycleLimit = tier.auditsPerCycle;
 
             return html`
                 <div className="space-y-8 animate-fade-in">
@@ -1819,7 +2209,7 @@
                     ${saveSuccess && html`
                         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 flex items-center gap-2 animate-fade-in">
                             <${CheckCircleIcon} size=${18} className="text-emerald-600 flex-shrink-0" />
-                            <span>Profile updated successfully! Your agency details and custom disclaimer notes will now white-label all generated PDF reports.</span>
+                            <span>${isWhiteLabelAllowed ? 'Profile updated successfully! Your agency details and custom notes will white-label all generated PDF reports.' : 'Profile updated! Upgrade to Growth Pro or Scale Agency to enable White-Label PDF branding.'}</span>
                         </div>
                     `}
 
@@ -1827,7 +2217,7 @@
                     <div className="p-8 sm:p-10 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-8">
                         <div className="space-y-1">
                             <h3 className="text-xl font-black text-gray-900">Agency & Account Profile</h3>
-                            <p className="text-xs text-gray-500">Fill in your information to personalize your dashboard and automatically white-label client PDF audit reports.</p>
+                            <p className="text-xs text-gray-500">Fill in your information to personalize your dashboard. White-label PDF branding unlocks on Growth Pro ($49) and Scale Agency ($249).</p>
                         </div>
 
                         <form onSubmit=${handleSubmit} className="space-y-6">
@@ -1860,34 +2250,6 @@
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
-                                        <${BuildingIcon} size=${14} className="text-red-600" /> Agency / Company Name (for PDF Header)
-                                    </label>
-                                    <input 
-                                        type="text" 
-                                        name="agencyName" 
-                                        value=${profileForm.agencyName} 
-                                        onChange=${handleChange}
-                                        placeholder="e.g. Apex Local SEO Group"
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 transition-all"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
-                                        <${GlobeIcon} size=${14} className="text-red-600" /> Agency Website URL
-                                    </label>
-                                    <input 
-                                        type="url" 
-                                        name="website" 
-                                        value=${profileForm.website} 
-                                        onChange=${handleChange}
-                                        placeholder="https://apexlocalseo.com"
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 transition-all"
-                                    />
-                                </div>
-
                                 <div className="space-y-2 md:col-span-2">
                                     <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
                                         <${MapPinIcon} size=${14} className="text-red-600" /> Default Target Market / Region
@@ -1902,19 +2264,83 @@
                                     />
                                 </div>
 
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
-                                        <${FileTextIcon} size=${14} className="text-red-600" /> White-Label PDF Footer Notes & Pitch Message
-                                    </label>
-                                    <textarea 
-                                        rows="3"
-                                        name="customPdfNotes" 
-                                        value=${profileForm.customPdfNotes} 
-                                        onChange=${handleChange}
-                                        placeholder="e.g. Complimentary GBP audit prepared by Apex Local SEO Group. Call us at (555) 123-4567 to implement these local 3-Pack rank optimizations for your business."
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 transition-all"
-                                    ></textarea>
-                                    <p className="text-[11px] text-gray-400">This custom note will replace the default footer disclaimer in all vector PDF downloads.</p>
+                                <!-- White-Label PDF Branding Section (Mapped to Pro & Agency Tiers) -->
+                                <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl border border-gray-200 bg-gray-50/70 space-y-5">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="text-sm font-black text-gray-900">White-Label PDF Report Branding</h4>
+                                                ${isWhiteLabelAllowed ? html`
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase">Unlocked</span>
+                                                ` : html`
+                                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-black uppercase flex items-center gap-1">
+                                                        <${LockIcon} size=${10} /> Pro & Agency Only
+                                                    </span>
+                                                `}
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                ${isWhiteLabelAllowed
+                                                    ? 'Your agency name, website, and custom footer notes appear on every 2-page PDF.'
+                                                    : 'Free Starter PDFs display standard GBP Auditor Pro branding. Upgrade to white-label PDFs with your agency name & footer CTA.'}
+                                            </p>
+                                        </div>
+                                        ${!isWhiteLabelAllowed && html`
+                                            <button
+                                                type="button"
+                                                onClick=${onOpenPricing}
+                                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+                                            >
+                                                <${CrownIcon} size=${14} /> Unlock White-Label
+                                            </button>
+                                        `}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                                <${BuildingIcon} size=${14} className="text-red-600" /> Agency / Company Name (PDF Header)
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                name="agencyName" 
+                                                value=${profileForm.agencyName} 
+                                                onChange=${handleChange}
+                                                disabled=${!isWhiteLabelAllowed}
+                                                placeholder="e.g. Apex Local SEO Group"
+                                                className="w-full px-4 py-3 bg-white disabled:bg-gray-100 disabled:text-gray-400 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 transition-all"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                                <${GlobeIcon} size=${14} className="text-red-600" /> Agency Website URL
+                                            </label>
+                                            <input 
+                                                type="url" 
+                                                name="website" 
+                                                value=${profileForm.website} 
+                                                onChange=${handleChange}
+                                                disabled=${!isWhiteLabelAllowed}
+                                                placeholder="https://apexlocalseo.com"
+                                                className="w-full px-4 py-3 bg-white disabled:bg-gray-100 disabled:text-gray-400 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 transition-all"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2 md:col-span-2">
+                                            <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                                <${FileTextIcon} size=${14} className="text-red-600" /> White-Label PDF Footer Notes & Pitch Message
+                                            </label>
+                                            <textarea 
+                                                rows="3"
+                                                name="customPdfNotes" 
+                                                value=${profileForm.customPdfNotes} 
+                                                onChange=${handleChange}
+                                                disabled=${!isWhiteLabelAllowed}
+                                                placeholder="e.g. Complimentary GBP audit prepared by Apex Local SEO Group. Call us at (555) 123-4567 to implement these local 3-Pack rank optimizations."
+                                                className="w-full px-4 py-3 bg-white disabled:bg-gray-100 disabled:text-gray-400 border border-gray-200 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 transition-all"
+                                            ></textarea>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1922,7 +2348,7 @@
                                 <button 
                                     type="submit" 
                                     disabled=${isSaving}
-                                    className="px-8 py-3.5 bg-gray-900 hover:bg-black text-white rounded-2xl font-black text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                                    className="px-8 py-3.5 bg-gray-900 hover:bg-black text-white rounded-2xl font-black text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                                 >
                                     ${isSaving ? 'Saving Profile...' : html`
                                         <${CheckIcon} size=${16} /> Save Profile Changes
@@ -1933,19 +2359,37 @@
                     </div>
 
                     <!-- Quota Usage Card in Profile -->
-                    <div className="p-8 bg-gray-50 rounded-3xl border border-gray-200 space-y-4">
+                    <div className="p-8 bg-gray-50 rounded-3xl border border-gray-200 space-y-5">
                         <div className="flex justify-between items-center">
                             <span className="text-xs font-black uppercase text-gray-500">30-Day Non-Rollover Cycle</span>
-                            <span className="text-xs font-bold text-red-600">${cycleDaysLeft} days remaining</span>
+                            <span className="text-xs font-bold text-red-600">${cycleDaysLeft} days remaining (resets ${new Date(cycleEndDate).toLocaleDateString()})</span>
                         </div>
-                        <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
-                            <div 
-                                className="bg-red-600 h-full transition-all duration-500"
-                                style=${{ width: `${Math.min(100, (auditsThisCycle / cycleLimit) * 100)}%` }}
-                            ></div>
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-bold text-gray-700">
+                                <span>GBP Audits</span>
+                                <span>${isAdmin ? 'Unlimited' : `${auditsThisCycle} / ${cycleLimit}`}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                                <div 
+                                    className="bg-red-600 h-full transition-all duration-500"
+                                    style=${{ width: `${Math.min(100, (auditsThisCycle / cycleLimit) * 100)}%` }}
+                                ></div>
+                            </div>
                         </div>
-                        <div className="flex justify-between items-center text-xs text-gray-500">
-                            <span>${auditsThisCycle} of ${cycleLimit} audits used</span>
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-bold text-gray-700">
+                                <span>Regional Lead Scout Searches</span>
+                                <span>${isAdmin ? 'Unlimited' : `${leadScoutsUsedInCycle} / ${tier.leadScoutsPerCycle}`}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                                <div 
+                                    className="bg-indigo-600 h-full transition-all duration-500"
+                                    style=${{ width: `${Math.min(100, (leadScoutsUsedInCycle / tier.leadScoutsPerCycle) * 100)}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
+                            <span>White-Label PDFs: <strong className="text-gray-800">${isWhiteLabelAllowed ? 'Enabled' : 'Standard Branding'}</strong></span>
                             <span>${credits > 0 ? `+${credits} non-expiring rollover credits` : '0 extra credits'}</span>
                         </div>
                     </div>
@@ -1954,13 +2398,27 @@
         };
 
         // --- 3. FRESH REGIONAL GOOGLE LEADS PROSPECTOR ---
-        const RegionalLeadsFinder = ({ onAuditLead, defaultRegion, onLeadsFound }) => {
+        const RegionalLeadsFinder = ({ 
+            onAuditLead, 
+            defaultRegion, 
+            onLeadsFound,
+            plan = 'free',
+            isAdmin = false,
+            leadScoutsUsedInCycle = 0,
+            onOpenPricing,
+            savedLeads = []
+        }) => {
             const [niche, setNiche] = useState('Roofing');
             const [region, setRegion] = useState(defaultRegion || 'Austin, TX');
             const [leads, setLeads] = useState([]);
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState(null);
             const [hasSearched, setHasSearched] = useState(false);
+
+            const tier = getTierConfig(plan);
+            const leadScoutLimit = tier.leadScoutsPerCycle;
+            const leadScoutsRemaining = Math.max(0, leadScoutLimit - leadScoutsUsedInCycle);
+            const canScoutLeads = isAdmin || leadScoutsUsedInCycle < leadScoutLimit;
 
             const presetNiches = [
                 "Roofers", "Dentists", "Plumbers", "HVAC Repair", 
@@ -1969,6 +2427,10 @@
 
             const handleSearch = async (e) => {
                 if (e) e.preventDefault();
+                if (!canScoutLeads) {
+                    if (onOpenPricing) onOpenPricing();
+                    return;
+                }
                 if (!niche || !region) return;
 
                 setIsLoading(true);
@@ -1997,10 +2459,10 @@
                 }
             };
 
-            const handleExportCsv = () => {
-                if (!leads.length) return;
+            const handleExportCsv = (rowsToExport = leads) => {
+                if (!rowsToExport.length) return;
                 const headers = ["Business Name", "Niche", "Location", "Phone", "Website", "Rating", "Reviews", "Vulnerability", "Opportunity Score", "Pitch Angle"];
-                const rows = leads.map(l => [
+                const rows = rowsToExport.map(l => [
                     `"${(l.businessName || '').replace(/"/g, '""')}"`,
                     `"${(l.niche || '').replace(/"/g, '""')}"`,
                     `"${(l.location || '').replace(/"/g, '""')}"`,
@@ -2025,6 +2487,27 @@
 
             return html`
                 <div className="space-y-8 animate-fade-in">
+                    <!-- Tier Lead Scout Quota Strip -->
+                    ${!isAdmin && html`
+                        <div className=${`p-4 rounded-2xl border text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-3 ${!canScoutLeads ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-indigo-50/70 border-indigo-200 text-indigo-950'}`}>
+                            <div className="flex items-center gap-3">
+                                <${CompassIcon} size=${18} className=${canScoutLeads ? 'text-indigo-600 shrink-0' : 'text-amber-600 shrink-0'} />
+                                <span className="font-bold">
+                                    ${canScoutLeads
+                                        ? html`${tier.name}: <span className="font-black text-indigo-700">${leadScoutsUsedInCycle}/${leadScoutLimit}</span> Lead Scout searches used this 30-day cycle (${leadScoutsRemaining} remaining)`
+                                        : html`Monthly Lead Scout Limit Reached (${leadScoutsUsedInCycle}/${leadScoutLimit}). Upgrade to Growth Pro (30/mo) or Scale Agency (200/mo)!`}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick=${onOpenPricing}
+                                className="px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-xs font-black text-red-600 flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                            >
+                                <${CrownIcon} size=${14} /> ${canScoutLeads ? 'Upgrade Limit' : 'Upgrade Plan'}
+                            </button>
+                        </div>
+                    `}
+
                     <!-- Scout Header & Search Box -->
                     <div className="p-8 sm:p-10 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-6">
                         <div className="space-y-1">
@@ -2033,7 +2516,7 @@
                             </div>
                             <h3 className="text-2xl font-black text-gray-900">Find Fresh Regional Leads for Any Niche</h3>
                             <p className="text-xs text-gray-500 max-w-2xl">
-                                Scout real local businesses from Google Maps for any industry and geographic market. Spot unoptimized profiles and run 1-click audits to pitch prospective clients.
+                                Scout local businesses for any industry and geographic market. Spot ranking gaps and run 1-click audits to pitch prospective clients.
                             </p>
                         </div>
 
@@ -2082,15 +2565,25 @@
                             </div>
 
                             <div className="sm:col-span-1 flex items-end">
-                                <button 
-                                    type="submit" 
-                                    disabled=${isLoading}
-                                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-sm shadow-md shadow-red-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    ${isLoading ? 'Scouting...' : html`
-                                        <${SearchIcon} size=${16} /> Scout Leads
-                                    `}
-                                </button>
+                                ${canScoutLeads ? html`
+                                    <button 
+                                        type="submit" 
+                                        disabled=${isLoading}
+                                        className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-sm shadow-md shadow-red-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        ${isLoading ? 'Scouting...' : html`
+                                            <${SearchIcon} size=${16} /> Scout Leads
+                                        `}
+                                    </button>
+                                ` : html`
+                                    <button 
+                                        type="button"
+                                        onClick=${onOpenPricing}
+                                        className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <${CrownIcon} size=${16} /> Upgrade
+                                    </button>
+                                `}
                             </div>
                         </form>
                     </div>
@@ -2117,8 +2610,8 @@
                                     <p className="text-xs text-gray-500">Click "Run 1-Click Audit" on any business to generate their comprehensive audit report and vector PDF.</p>
                                 </div>
                                 <button 
-                                    onClick=${handleExportCsv}
-                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                                    onClick=${() => handleExportCsv(leads)}
+                                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                                 >
                                     <${DownloadIcon} size=${14} /> Export CSV
                                 </button>
@@ -2197,6 +2690,58 @@
                             <p className="text-xs text-gray-500 max-w-md mx-auto">
                                 Enter any niche (e.g. "Roofing", "Chiropractor", "Plumbing") and your target regional market above to discover ripe local prospects and generate 1-click audit reports.
                             </p>
+                        </div>
+                    `}
+
+                    <!-- Saved Scouted Leads History (Persisted in Firestore) -->
+                    ${savedLeads && savedLeads.length > 0 && html`
+                        <div className="p-6 sm:p-8 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div>
+                                    <h4 className="text-base font-black text-gray-900">Your Saved Regional Prospects (${savedLeads.length})</h4>
+                                    <p className="text-xs text-gray-500">Previously scouted prospects saved to your account.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick=${() => handleExportCsv(savedLeads)}
+                                    className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <${DownloadIcon} size=${14} /> Export All Saved CSV
+                                </button>
+                            </div>
+                            <div className="overflow-x-auto border border-gray-100 rounded-2xl">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-gray-50 border-b border-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-500">
+                                        <tr>
+                                            <th className="px-4 py-3">Business</th>
+                                            <th className="px-4 py-3">Market</th>
+                                            <th className="px-4 py-3">Gap</th>
+                                            <th className="px-4 py-3 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        ${savedLeads.slice(0, 20).map((sLead, idx) => html`
+                                            <tr key=${sLead.id || idx} className="hover:bg-gray-50/70">
+                                                <td className="px-4 py-3 font-bold text-gray-900">
+                                                    <div>${sLead.businessName}</div>
+                                                    <div className="text-[11px] font-normal text-gray-400">${sLead.niche || 'Local Service'} • ${sLead.rating || 4.2}★ (${sLead.reviewCount || 0})</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-600">${sLead.location}</td>
+                                                <td className="px-4 py-3 text-red-700 font-semibold">${sLead.googleMapsStatus || 'Ranking gap'}</td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick=${() => onAuditLead(sLead)}
+                                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black inline-flex items-center gap-1 cursor-pointer"
+                                                    >
+                                                        <${RocketIcon} size=${12} /> 1-Click Audit
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `)}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     `}
                 </div>
@@ -2740,9 +3285,11 @@
                             ...map.get(key),
                             ...u,
                             email: u.email || key,
-                            displayName: u.displayName || u.email?.split('@')[0] || 'User',
-                            plan: u.plan || 'free',
-                            credits: u.credits ?? 0,
+                            displayName: u.displayName || u.name || u.email?.split('@')[0] || 'User',
+                            plan: u.subscriptionPlan || u.plan || 'free',
+                            credits: u.creditsBalance ?? u.credits ?? 0,
+                            leadScoutsUsedInCycle: u.leadScoutsUsedInCycle || 0,
+                            lastPaymentRef: u.lastPaymentRef || '',
                             lastActiveTimestamp: u.lastActiveTimestamp || Date.now() - 3600000 * 2
                         });
                     }
@@ -3225,6 +3772,11 @@
                                                                     <option value="pro_49">Growth Pro ($49/mo - 100)</option>
                                                                     <option value="agency_249">Scale Agency ($249/mo - 700)</option>
                                                                 </select>
+                                                                ${userItem.lastPaymentRef && html`
+                                                                    <div className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 truncate max-w-[180px]" title=${`PayPal Ref: ${userItem.lastPaymentRef}`}>
+                                                                        Ref: ${userItem.lastPaymentRef}
+                                                                    </div>
+                                                                `}
                                                             </div>
                                                         </td>
 
@@ -3265,7 +3817,7 @@
                                                                 ${userItem.auditsCount || 0} <span className="text-[10px] text-gray-400 font-normal">audits</span>
                                                             </div>
                                                             <div className="text-[11px] text-gray-500">
-                                                                ${userItem.leadsCount || 0} <span className="text-[10px] text-gray-400">leads scouted</span>
+                                                                ${userItem.leadsCount || 0} <span className="text-[10px] text-gray-400">leads</span> • ${userItem.leadScoutsUsedInCycle || 0} <span className="text-[10px] text-gray-400">scouts</span>
                                                             </div>
                                                         </td>
 
@@ -3904,10 +4456,10 @@
                                         </div>
                                         <p className="text-xs text-gray-500">Sign in with Google to claim your monthly audit allowance. No credit card required.</p>
                                         <ul className="space-y-2.5 pt-4 border-t border-gray-100 text-xs font-medium text-gray-600">
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 1 full audit per 30-day window</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 1 full audit & 1 Regional Lead Scout / 30 days</li>
                                             <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Up to 6 scans per calendar year</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 6-Pillar signal diagnostic</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Client-ready 2-page vector PDF</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 6-Pillar diagnostic & email draft generator</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 2-page vector PDF (standard branding)</li>
                                             <li className="flex items-center gap-2 text-gray-400"><${XIcon} size=${14} /> Audits do not rollover</li>
                                         </ul>
                                     </div>
@@ -3932,14 +4484,14 @@
                                         <h3 className="text-2xl font-black text-gray-900">Growth Pro</h3>
                                         <div className="space-y-1">
                                             <div className="text-4xl font-black text-gray-900">$49 <span className="text-sm font-bold text-gray-400">/ month</span></div>
-                                            <p className="text-xs font-bold text-red-600">100 audits per 30 days ($0.49/audit)</p>
+                                            <p className="text-xs font-bold text-red-600">100 audits & 30 Lead Scouts / 30 days</p>
                                         </div>
                                         <p className="text-xs text-gray-500">Perfect for local SEO freelancers and active agency prospecting.</p>
                                         <ul className="space-y-2.5 pt-4 border-t border-gray-100 text-xs font-medium text-gray-600">
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 100 audits every 30 days</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Instant vector PDF downloads</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Competitor 3-Pack benchmark</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Full audit history in vault</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 100 audits every 30 days ($0.49/audit)</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 30 Regional Lead Scout searches / 30 days</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> White-label PDFs (Agency Name & Notes)</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Persistent audit & prospect vault</li>
                                             <li className="flex items-center gap-2 text-gray-450"><${ClockIcon} size=${14} /> 30-Day cycle (no rollover)</li>
                                         </ul>
                                     </div>
@@ -3963,14 +4515,14 @@
                                         <h3 className="text-2xl font-black text-gray-900">Scale Agency</h3>
                                         <div className="space-y-1">
                                             <div className="text-4xl font-black text-gray-900">$249 <span className="text-sm font-bold text-gray-400">/ month</span></div>
-                                            <p className="text-xs font-bold text-amber-700">700 audits per 30 days (~$0.35/audit)</p>
+                                            <p className="text-xs font-bold text-amber-700">700 audits & 200 Lead Scouts / 30 days</p>
                                         </div>
                                         <p className="text-xs text-gray-500">For scaling agencies and outbound sales teams conducting high-volume cold pitches.</p>
                                         <ul className="space-y-2.5 pt-4 border-t border-gray-100 text-xs font-medium text-gray-600">
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 700 audits every 30 days</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 700 audits every 30 days (~$0.35/audit)</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> 200 Regional Lead Scout searches / 30 days</li>
+                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Full white-label PDF & custom pitch footer</li>
                                             <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Lowest cost per audit ($0.35)</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> White-label ready presentation format</li>
-                                            <li className="flex items-center gap-2"><${CheckIcon} size=${15} className="text-emerald-500 flex-shrink-0" /> Priority processing queue</li>
                                             <li className="flex items-center gap-2 text-gray-450"><${ClockIcon} size=${14} /> 30-Day cycle (no rollover)</li>
                                         </ul>
                                     </div>
@@ -4122,6 +4674,9 @@
             credits,
             history,
             auditsThisCycle,
+            auditsThisYear = 0,
+            leadScoutsUsedInCycle = 0,
+            userScoutedLeads = [],
             cycleDaysLeft,
             cycleEndDate,
             onRunAudit,
@@ -4133,6 +4688,7 @@
             onOpenPricing,
             onViewAudit,
             onGeneratePdf,
+            onOrderService,
             isAdmin,
             paypalUrls,
             onGoToLanding,
@@ -4152,9 +4708,13 @@
 
             const [historySearch, setHistorySearch] = useState('');
 
-            // Calculate quota limits for this 30-day cycle
-            const cycleLimit = plan === 'agency_249' ? 700 : plan === 'pro_49' ? 100 : 1;
+            // Calculate quota limits for this 30-day cycle from TIER_CONFIG
+            const tier = getTierConfig(plan);
+            const cycleLimit = tier.auditsPerCycle;
             const cycleRemaining = Math.max(0, cycleLimit - auditsThisCycle);
+            const leadScoutLimit = tier.leadScoutsPerCycle;
+            const leadScoutsRemaining = Math.max(0, leadScoutLimit - leadScoutsUsedInCycle);
+            const isWhiteLabelAllowed = isAdmin || tier.whiteLabelPdf;
 
             const filteredUserHistory = history.filter(h => {
                 const q = historySearch.toLowerCase().trim();
@@ -4168,20 +4728,23 @@
                     <!-- Top 30-Day Quota & Subscription Indicator Card -->
                     <div className="p-6 sm:p-8 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-6">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
+                            <div className="space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-black uppercase tracking-wider text-gray-400">Current Subscription</span>
                                     <span className=${`px-3 py-1 rounded-xl text-xs font-black ${plan === 'agency_249' ? 'bg-amber-100 text-amber-900 border border-amber-200' : plan === 'pro_49' ? 'bg-red-100 text-red-900 border border-red-200' : 'bg-gray-100 text-gray-800 border border-gray-200'}`}>
                                         ${plan === 'agency_249' ? 'Scale Agency ($249/mo)' : plan === 'pro_49' ? 'Growth Pro ($49/mo)' : 'Free Starter ($0/mo)'}
+                                    </span>
+                                    <span className=${`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase ${isWhiteLabelAllowed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-500 border border-gray-200'}`}>
+                                        ${isWhiteLabelAllowed ? 'White-Label PDF' : 'Standard PDF'}
                                     </span>
                                     ${isAdmin && html`
                                         <span className="px-2.5 py-1 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase">Admin Access</span>
                                     `}
                                 </div>
                                 <h2 className="text-2xl font-black text-gray-900">
-                                    ${isAdmin ? 'Unlimited Audits Available' : html`
+                                    ${isAdmin ? 'Unlimited Audits & Lead Scouts Available' : html`
                                         <span>${cycleRemaining} Audits Remaining</span>
-                                        <span className="text-sm font-bold text-gray-400 ml-2">(${auditsThisCycle} / ${cycleLimit} used)</span>
+                                        <span className="text-sm font-bold text-gray-400 ml-2">(${auditsThisCycle}/${cycleLimit} audits • ${leadScoutsRemaining}/${leadScoutLimit} lead scouts left)</span>
                                     `}
                                 </h2>
                             </div>
@@ -4189,7 +4752,7 @@
                             <div className="flex flex-wrap items-center gap-3">
                                 <button 
                                     onClick=${onOpenPricing}
-                                    className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white rounded-xl text-xs font-black shadow-sm transition-all active:scale-95 flex items-center gap-2"
+                                    className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white rounded-xl text-xs font-black shadow-sm transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
                                 >
                                     <${CrownIcon} size=${15} /> Upgrade / Buy Credits
                                 </button>
@@ -4205,7 +4768,7 @@
                                         Current 30-Day Window: <strong className="text-red-600">${cycleDaysLeft} days remaining</strong> (resets ${new Date(cycleEndDate).toLocaleDateString()})
                                     </span>
                                     <span className="text-[11px] text-gray-400 font-semibold">
-                                        Audits do not rollover into next cycle
+                                        Monthly quotas do not rollover
                                     </span>
                                 </div>
 
@@ -4217,8 +4780,8 @@
                                     ></div>
                                 </div>
 
-                                <div className="flex justify-between items-center text-[11px] text-gray-500 pt-1">
-                                    <span>${auditsThisCycle} of ${cycleLimit} audits used</span>
+                                <div className="flex flex-wrap justify-between items-center gap-2 text-[11px] text-gray-500 pt-1">
+                                    <span>Audits: <strong>${auditsThisCycle}/${cycleLimit}</strong> • Lead Scouts: <strong>${leadScoutsUsedInCycle}/${leadScoutLimit}</strong></span>
                                     <span>${credits > 0 ? html`<strong className="text-emerald-600">+${credits} non-expiring credits available</strong>` : '0 extra credits'}</span>
                                 </div>
                             </div>
@@ -4276,6 +4839,7 @@
                                     credits=${credits}
                                     onOpenPricing=${onOpenPricing}
                                     userProfile=${userProfile}
+                                    onOrderService=${onOrderService}
                                 />
                             ` : html`
                                 <div className="space-y-8">
@@ -4286,7 +4850,7 @@
                                         plan=${plan}
                                         credits=${credits}
                                         auditsThisMonth=${auditsThisCycle}
-                                        auditsThisYear=${history.length}
+                                        auditsThisYear=${auditsThisYear}
                                         onOpenPricing=${onOpenPricing}
                                         user=${user}
                                         userProfile=${userProfile}
@@ -4307,6 +4871,11 @@
                             }}
                             defaultRegion=${userProfile?.defaultLocation}
                             onLeadsFound=${onSaveScoutedLeads}
+                            plan=${plan}
+                            isAdmin=${isAdmin}
+                            leadScoutsUsedInCycle=${leadScoutsUsedInCycle}
+                            onOpenPricing=${onOpenPricing}
+                            savedLeads=${userScoutedLeads}
                         />
                     `}
 
@@ -4317,8 +4886,10 @@
                             userProfile=${userProfile}
                             onSaveProfile=${onSaveProfile}
                             plan=${plan}
+                            isAdmin=${isAdmin}
                             credits=${credits}
                             auditsThisCycle=${auditsThisCycle}
+                            leadScoutsUsedInCycle=${leadScoutsUsedInCycle}
                             cycleDaysLeft=${cycleDaysLeft}
                             cycleEndDate=${cycleEndDate}
                             onOpenPricing=${onOpenPricing}
@@ -4415,11 +4986,16 @@
                         <div className="space-y-8">
                             <div className="p-8 bg-white rounded-3xl border border-gray-200 shadow-sm space-y-6">
                                 <h3 className="text-2xl font-black text-gray-900">Subscription & 30-Day Quota Rules</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                                     <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
                                         <span className="text-xs font-black uppercase text-gray-400">Current Plan</span>
-                                        <p className="text-xl font-black text-gray-900">${plan === 'agency_249' ? 'Scale Agency ($249)' : plan === 'pro_49' ? 'Growth Pro ($49)' : 'Free Starter'}</p>
-                                        <p className="text-xs text-gray-500">${cycleLimit} audits per 30-day billing cycle</p>
+                                        <p className="text-xl font-black text-gray-900">${tier.name} ${tier.price > 0 ? `($${tier.price})` : ''}</p>
+                                        <p className="text-xs text-gray-500">${cycleLimit} audits & ${leadScoutLimit} lead scouts / 30d</p>
+                                    </div>
+                                    <div className="p-5 bg-indigo-50/60 rounded-2xl border border-indigo-200 space-y-2">
+                                        <span className="text-xs font-black uppercase text-indigo-600">PDF Branding</span>
+                                        <p className="text-xl font-black text-indigo-950">${isWhiteLabelAllowed ? 'White-Label' : 'Standard'}</p>
+                                        <p className="text-xs text-indigo-700/80">${isWhiteLabelAllowed ? 'Custom agency header & footer' : 'Upgrade to Pro/Agency to unlock'}</p>
                                     </div>
                                     <div className="p-5 bg-red-50/60 rounded-2xl border border-red-200 space-y-2">
                                         <span className="text-xs font-black uppercase text-red-500">Cycle Reset Countdown</span>
@@ -4435,7 +5011,7 @@
 
                                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs font-medium text-amber-900 space-y-1">
                                     <p className="font-bold flex items-center gap-1.5"><${AlertCircleIcon} size=${15} /> 30-Day Non-Rollover Policy:</p>
-                                    <p>Monthly subscription audits are provided on a 30-day recurring basis and do not rollover if unused. One-time credit packs never expire and are automatically consumed when your monthly cycle quota is exhausted.</p>
+                                    <p>Monthly subscription audits & Regional Lead Scout searches reset every 30 days and do not rollover if unused. One-time credit packs never expire and are automatically consumed when your monthly audit quota is exhausted.</p>
                                 </div>
                             </div>
 
@@ -4445,32 +5021,50 @@
                                     <div className="space-y-3">
                                         <span className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-black">Pro Tier</span>
                                         <h4 className="text-2xl font-black text-gray-900">Growth Pro — $49 / month</h4>
-                                        <p className="text-xs text-gray-500">100 audits every 30 days ($0.49/audit). Immediate vector PDF generation.</p>
+                                        <p className="text-xs text-gray-500">100 audits + 30 Regional Lead Scout searches every 30 days ($0.49/audit), plus White-Label Agency PDF branding.</p>
                                     </div>
-                                    <a 
-                                        href=${paypalUrls.plan_pro_49} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider text-center shadow-md transition-all active:scale-95"
-                                    >
-                                        Upgrade to Pro ($49/mo)
-                                    </a>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <a 
+                                            href=${paypalUrls.plan_pro_49} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider text-center shadow-md transition-all active:scale-95"
+                                        >
+                                            Pay via PayPal ($49/mo)
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick=${onOpenPricing}
+                                            className="px-4 py-3.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-900 rounded-xl text-xs font-black cursor-pointer"
+                                        >
+                                            Activate Plan
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="p-8 bg-gradient-to-br from-white to-amber-50/20 rounded-3xl border-2 border-amber-400 shadow-sm flex flex-col justify-between space-y-6">
                                     <div className="space-y-3">
                                         <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-lg text-xs font-black">Agency Tier</span>
                                         <h4 className="text-2xl font-black text-gray-900">Scale Agency — $249 / month</h4>
-                                        <p className="text-xs text-gray-500">700 audits every 30 days (~$0.35/audit). Best rate for digital marketing teams.</p>
+                                        <p className="text-xs text-gray-500">700 audits + 200 Regional Lead Scout searches every 30 days (~$0.35/audit), plus full White-Label PDF reports.</p>
                                     </div>
-                                    <a 
-                                        href=${paypalUrls.plan_agency_249} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="py-3.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider text-center shadow-md transition-all active:scale-95"
-                                    >
-                                        Upgrade to Agency ($249/mo)
-                                    </a>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <a 
+                                            href=${paypalUrls.plan_agency_249} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex-1 py-3.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider text-center shadow-md transition-all active:scale-95"
+                                        >
+                                            Pay via PayPal ($249/mo)
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick=${onOpenPricing}
+                                            className="px-4 py-3.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-900 rounded-xl text-xs font-black cursor-pointer"
+                                        >
+                                            Activate Plan
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4555,11 +5149,22 @@
                 }
             });
 
-            // Plan & Credits state
+            // Plan, Credits, Cycle & UI Feedback state
             const [plan, setPlan] = useState('free'); // 'free' | 'pro_49' | 'agency_249'
             const [credits, setCredits] = useState(0);
+            const [cycleStart, setCycleStart] = useState(() => Date.now());
+            const [leadScoutsUsedInCycle, setLeadScoutsUsedInCycle] = useState(0);
+            const [userScoutedLeads, setUserScoutedLeads] = useState([]);
             const [showPricingModal, setShowPricingModal] = useState(false);
             const [previewPdfData, setPreviewPdfData] = useState(null);
+            const [toastMessage, setToastMessage] = useState(null);
+            const [serviceOrderItem, setServiceOrderItem] = useState(null);
+            const [copiedOrder, setCopiedOrder] = useState(false);
+
+            const showToast = (text, type = 'success') => {
+                setToastMessage({ text, type });
+                setTimeout(() => setToastMessage(prev => (prev?.text === text ? null : prev)), 5000);
+            };
 
             const [paypalUrls, setPaypalUrls] = useState(() => {
                 try {
@@ -4598,20 +5203,74 @@
                 return unsubscribe;
             }, []);
 
-            // Load and sync user profile from Firestore once authenticated with Google
+            // Check if current user is an authorized admin
+            const isAdmin = Boolean(user?.email && ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase().trim()));
+
+            // Load and sync user profile, plan, credits, and 30-day cycle counters from Firestore once authenticated
             useEffect(() => {
-                if (!user) return;
+                if (!user) {
+                    setPlan('free');
+                    setCredits(0);
+                    setLeadScoutsUsedInCycle(0);
+                    setUserScoutedLeads([]);
+                    return;
+                }
+
+                // Instant local cache hydration while Firestore loads
+                const cachedPlan = localStorage.getItem(`gbp_plan_${user.uid}`) || 'free';
+                const cachedCredits = parseInt(localStorage.getItem(`gbp_credits_${user.uid}`) || '0', 10);
+                const cachedScouts = parseInt(localStorage.getItem(`gbp_scouts_${user.uid}`) || '0', 10);
+                const cachedCycleStart = parseInt(localStorage.getItem(`gbp_cycle_start_${user.uid}`) || '0', 10);
+                setPlan(cachedPlan);
+                setCredits(cachedCredits);
+                setLeadScoutsUsedInCycle(cachedScouts);
+                if (cachedCycleStart) setCycleStart(cachedCycleStart);
+
                 const loadProfile = async () => {
+                    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+                    const nowTs = Date.now();
                     try {
-                        const snap = await getDoc(doc(db, "users", user.uid));
+                        const userRef = doc(db, "users", user.uid);
+                        const snap = await getDoc(userRef);
                         if (snap.exists()) {
                             const data = snap.data();
+                            const resolvedPlan = data.subscriptionPlan || data.plan || cachedPlan || 'free';
+                            const resolvedCredits = data.creditsBalance ?? data.credits ?? cachedCredits ?? 0;
+                            let resolvedCycleStart = data.cycleStart || cachedCycleStart || nowTs;
+                            let resolvedScouts = data.leadScoutsUsedInCycle ?? cachedScouts ?? 0;
+
+                            if ((nowTs - resolvedCycleStart) >= THIRTY_DAYS) {
+                                resolvedCycleStart = nowTs;
+                                resolvedScouts = 0;
+                            }
+
                             setUserProfile(prev => ({
                                 ...prev,
                                 ...data,
                                 name: data.name || user.displayName || prev.name || '',
                                 email: user.email || ''
                             }));
+                            setPlan(resolvedPlan);
+                            setCredits(resolvedCredits);
+                            setCycleStart(resolvedCycleStart);
+                            setLeadScoutsUsedInCycle(resolvedScouts);
+
+                            localStorage.setItem(`gbp_plan_${user.uid}`, resolvedPlan);
+                            localStorage.setItem(`gbp_credits_${user.uid}`, String(resolvedCredits));
+                            localStorage.setItem(`gbp_cycle_start_${user.uid}`, String(resolvedCycleStart));
+                            localStorage.setItem(`gbp_scouts_${user.uid}`, String(resolvedScouts));
+
+                            await setDoc(userRef, {
+                                email: user.email || data.email || '',
+                                name: data.name || user.displayName || '',
+                                subscriptionPlan: resolvedPlan,
+                                plan: resolvedPlan,
+                                creditsBalance: resolvedCredits,
+                                credits: resolvedCredits,
+                                cycleStart: resolvedCycleStart,
+                                leadScoutsUsedInCycle: resolvedScouts,
+                                lastActiveTimestamp: nowTs
+                            }, { merge: true });
                         } else {
                             const initial = {
                                 name: user.displayName || '',
@@ -4620,10 +5279,18 @@
                                 agencyName: userProfile.agencyName || '',
                                 website: userProfile.website || '',
                                 defaultLocation: userProfile.defaultLocation || '',
-                                customPdfNotes: userProfile.customPdfNotes || ''
+                                customPdfNotes: userProfile.customPdfNotes || '',
+                                subscriptionPlan: cachedPlan || 'free',
+                                plan: cachedPlan || 'free',
+                                creditsBalance: cachedCredits || 0,
+                                credits: cachedCredits || 0,
+                                cycleStart: cachedCycleStart || nowTs,
+                                leadScoutsUsedInCycle: cachedScouts || 0,
+                                lastActiveTimestamp: nowTs
                             };
                             setUserProfile(initial);
-                            await setDoc(doc(db, "users", user.uid), initial, { merge: true });
+                            setCycleStart(initial.cycleStart);
+                            await setDoc(userRef, initial, { merge: true });
                         }
                     } catch (err) {
                         console.warn("Could not load user profile from Firestore:", err);
@@ -4646,40 +5313,56 @@
                 }
             };
 
-            // Check if current user is an authorized admin
-            const isAdmin = Boolean(user?.email && ADMIN_EMAILS.map(e => e.toLowerCase()).includes(user.email.toLowerCase().trim()));
-
-            // Load subscription & credits for logged in user
-            useEffect(() => {
-                if (!user) {
-                    setPlan('free');
-                    setCredits(0);
-                    return;
-                }
-                const savedPlan = localStorage.getItem(`gbp_plan_${user.uid}`) || 'free';
-                const savedCredits = parseInt(localStorage.getItem(`gbp_credits_${user.uid}`) || '0', 10);
-                setPlan(savedPlan);
-                setCredits(savedCredits);
-            }, [user]);
-
-            const handleSelectPlan = (newPlan) => {
+            const handleSelectPlan = async (newPlan, paymentRef = '') => {
                 setPlan(newPlan);
+                setShowPricingModal(false);
                 if (user) {
                     localStorage.setItem(`gbp_plan_${user.uid}`, newPlan);
+                    setAllUsers(prev => prev.map(u =>
+                        (u.id === user.uid || u.userId === user.uid || u.email?.toLowerCase() === user.email?.toLowerCase())
+                            ? { ...u, plan: newPlan, subscriptionPlan: newPlan, lastPaymentRef: paymentRef || u.lastPaymentRef || '' }
+                            : u
+                    ));
+                    try {
+                        await setDoc(doc(db, "users", user.uid), {
+                            subscriptionPlan: newPlan,
+                            plan: newPlan,
+                            ...(paymentRef ? { lastPaymentRef: paymentRef } : {}),
+                            planUpdatedAt: new Date().toISOString(),
+                            lastActiveTimestamp: Date.now()
+                        }, { merge: true });
+                    } catch (err) {
+                        console.error("Firestore plan update error:", err);
+                    }
                 }
-                setShowPricingModal(false);
-                const label = newPlan === 'pro_49' ? 'Growth Pro ($49/mo - 100 audits)' : newPlan === 'agency_249' ? 'Scale Agency ($249/mo - 700 audits)' : 'Free Starter (1 audit/mo, max 6/yr)';
-                alert(`Plan activated: ${label}`);
+                const label = newPlan === 'pro_49' ? 'Growth Pro ($49/mo - 100 audits & 30 scouts)' : newPlan === 'agency_249' ? 'Scale Agency ($249/mo - 700 audits & 200 scouts)' : 'Free Starter (1 audit/mo, max 6/yr)';
+                showToast(`Plan activated: ${label}`, 'success');
             };
 
-            const handleAddCredits = (amount, title) => {
+            const handleAddCredits = async (amount, title, paymentRef = '') => {
                 const updated = credits + amount;
                 setCredits(updated);
+                setShowPricingModal(false);
                 if (user) {
                     localStorage.setItem(`gbp_credits_${user.uid}`, updated.toString());
+                    setAllUsers(prev => prev.map(u =>
+                        (u.id === user.uid || u.userId === user.uid || u.email?.toLowerCase() === user.email?.toLowerCase())
+                            ? { ...u, credits: updated, creditsBalance: updated, lastPaymentRef: paymentRef || u.lastPaymentRef || '' }
+                            : u
+                    ));
+                    try {
+                        await setDoc(doc(db, "users", user.uid), {
+                            creditsBalance: updated,
+                            credits: updated,
+                            ...(paymentRef ? { lastPaymentRef: paymentRef } : {}),
+                            creditsUpdatedAt: new Date().toISOString(),
+                            lastActiveTimestamp: Date.now()
+                        }, { merge: true });
+                    } catch (err) {
+                        console.error("Firestore credits update error:", err);
+                    }
                 }
-                setShowPricingModal(false);
-                alert(`Added +${amount} credits to your account! Total credits: ${updated}`);
+                showToast(`Added +${amount} credits! Total credit balance: ${updated}`, 'success');
             };
 
             const login = async () => {
@@ -4717,7 +5400,8 @@
                             return null;
                         }
                         if (code === 'auth/unauthorized-domain') {
-                            setAuthError('This domain is not authorized for Google Sign-In in Firebase Authentication.');
+                            const host = window.location.hostname || 'this domain';
+                            setAuthError(`Domain "${host}" is not authorized for Google Sign-In. Add "${host}" in Firebase Console → Authentication → Settings → Authorized domains.`);
                             return null;
                         }
                         setAuthError(err?.message || 'Unable to sign in with Google right now. Please try again.');
@@ -4768,6 +5452,7 @@
                                 const scoutedSnap = await getDocs(query(collection(db, "scouted_leads"), orderBy("timestamp", "desc")));
                                 const scoutedData = scoutedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                                 setAllLeads(scoutedData);
+                                setUserScoutedLeads(scoutedData.filter(l => l.userId === user.uid || l.scoutedByUserId === user.uid));
                             } catch (e) {
                                 console.warn("Could not fetch scouted_leads:", e);
                             }
@@ -4790,6 +5475,20 @@
                             } catch (e) {
                                 console.warn("Could not fetch users:", e);
                             }
+                        } else {
+                            // Fetch this user's saved scouted leads without composite index
+                            try {
+                                const userScoutedSnap = await getDocs(query(
+                                    collection(db, "scouted_leads"),
+                                    where("userId", "==", user.uid)
+                                ));
+                                const userScoutedData = userScoutedSnap.docs
+                                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                                    .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+                                setUserScoutedLeads(userScoutedData);
+                            } catch (e) {
+                                console.warn("Could not fetch user scouted_leads:", e);
+                            }
                         }
                     } catch (err) {
                         console.error("Failed to fetch history:", err);
@@ -4801,20 +5500,14 @@
             // 30-Day Cycle Window & Non-Rollover Logic
             const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
             const now = Date.now();
-            let cycleStart = user ? parseInt(localStorage.getItem(`gbp_cycle_start_${user.uid}`) || '0', 10) : now;
-            
-            if (!cycleStart || (now - cycleStart) >= THIRTY_DAYS_MS) {
-                cycleStart = now;
-                if (user) {
-                    localStorage.setItem(`gbp_cycle_start_${user.uid}`, cycleStart.toString());
-                }
-            }
-
-            const cycleEndDate = cycleStart + THIRTY_DAYS_MS;
+            const effectiveCycleStart = (cycleStart && (now - cycleStart) < THIRTY_DAYS_MS) ? cycleStart : now;
+            const cycleEndDate = effectiveCycleStart + THIRTY_DAYS_MS;
             const cycleDaysLeft = Math.max(1, Math.ceil((cycleEndDate - now) / (24 * 60 * 60 * 1000)));
 
             const userLeads = history.filter(h => h.userId === user?.uid);
-            const auditsThisCycle = userLeads.filter(h => h.timestamp && new Date(h.timestamp).getTime() >= cycleStart).length;
+            const currentYear = new Date().getFullYear();
+            const auditsThisCycle = userLeads.filter(h => h.timestamp && new Date(h.timestamp).getTime() >= effectiveCycleStart).length;
+            const auditsThisYear = userLeads.filter(h => h.timestamp && new Date(h.timestamp).getFullYear() === currentYear).length;
 
             const runAudit = async (data) => {
                 let activeUser = user;
@@ -4827,40 +5520,22 @@
                 if (!activeUser) return;
 
                 const userIsAdmin = Boolean(activeUser.email && ADMIN_EMAILS.map(e => e.toLowerCase()).includes(activeUser.email.toLowerCase().trim()));
-                const userPlan = localStorage.getItem(`gbp_plan_${activeUser.uid}`) || plan;
-                const userCredits = parseInt(localStorage.getItem(`gbp_credits_${activeUser.uid}`) || credits.toString(), 10);
+                const userPlan = plan || localStorage.getItem(`gbp_plan_${activeUser.uid}`) || 'free';
+                const userCredits = Number.isFinite(credits) ? credits : parseInt(localStorage.getItem(`gbp_credits_${activeUser.uid}`) || '0', 10);
+                const userTier = getTierConfig(userPlan);
 
                 // Quota validation for 30-day non-rollover cycle
                 let willConsumeCredit = false;
 
                 if (!userIsAdmin) {
-                    if (userPlan === 'agency_249') {
-                        if (auditsThisCycle >= 700) {
-                            if (userCredits > 0) {
-                                willConsumeCredit = true;
-                            } else {
-                                setShowPricingModal(true);
-                                return;
-                            }
-                        }
-                    } else if (userPlan === 'pro_49') {
-                        if (auditsThisCycle >= 100) {
-                            if (userCredits > 0) {
-                                willConsumeCredit = true;
-                            } else {
-                                setShowPricingModal(true);
-                                return;
-                            }
-                        }
-                    } else {
-                        // Free Tier: 1 audit per 30 days (max 6 per year)
-                        if (auditsThisCycle >= 1 || userLeads.length >= 6) {
-                            if (userCredits > 0) {
-                                willConsumeCredit = true;
-                            } else {
-                                setShowPricingModal(true);
-                                return;
-                            }
+                    const overCycleLimit = auditsThisCycle >= userTier.auditsPerCycle;
+                    const overAnnualCap = userTier.maxAuditsPerYear !== null && auditsThisYear >= userTier.maxAuditsPerYear;
+                    if (overCycleLimit || overAnnualCap) {
+                        if (userCredits > 0) {
+                            willConsumeCredit = true;
+                        } else {
+                            setShowPricingModal(true);
+                            return;
                         }
                     }
                 }
@@ -4971,11 +5646,13 @@
             };
 
             const handleDirectPdfDownload = (item) => {
+                const isWhiteLabelAllowed = isAdmin || getTierConfig(plan).whiteLabelPdf;
                 const pdf = generateAuditPDF({
                     result: item,
                     businessName: item.businessName,
                     businessDetails: item,
-                    userProfile: userProfile
+                    userProfile: userProfile,
+                    isWhiteLabelAllowed
                 });
                 if (pdf && pdf.download) {
                     pdf.download();
@@ -4984,7 +5661,7 @@
 
             const clearHistory = async () => {
                 if (!isAdmin) {
-                    alert("Unauthorized access restricted to verified admins.");
+                    showToast("Unauthorized access restricted to verified admins.", "error");
                     return;
                 }
                 
@@ -4996,28 +5673,47 @@
                     const batch = snapshot.docs.map(d => deleteDoc(doc(db, "leads", d.id)));
                     await Promise.all(batch);
                     setHistory([]);
-                    alert("Vault purged successfully.");
+                    showToast("Vault purged successfully.", "success");
                 } catch (err) {
                     console.error("Purge failed:", err);
-                    alert("Failed to purge vault. Check permissions.");
+                    showToast("Failed to purge vault. Check Firestore permissions.", "error");
                 } finally {
                     setIsLoading(false);
                 }
             };
 
             const handleSaveScoutedLeads = async (newLeads, nicheParam, regionParam) => {
+                const uid = user?.uid || 'anonymous';
                 const enriched = (newLeads || []).map(l => ({
                     ...l,
                     id: l.id || `lead_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    userId: uid,
                     niche: l.niche || nicheParam || '',
                     location: l.location || regionParam || '',
                     scoutedByUserEmail: user?.email || 'Platform Scout',
-                    scoutedByUserId: user?.uid || 'anonymous',
+                    scoutedByUserId: uid,
                     timestamp: new Date().toISOString()
                 }));
                 setAllLeads(prev => [...enriched, ...prev]);
+                setUserScoutedLeads(prev => [...enriched, ...prev]);
 
-                // Record in Firestore scouted_leads collection
+                // Track 30-day cycle Lead Scout usage
+                const nextScouts = leadScoutsUsedInCycle + 1;
+                setLeadScoutsUsedInCycle(nextScouts);
+                if (user) {
+                    localStorage.setItem(`gbp_scouts_${user.uid}`, String(nextScouts));
+                    try {
+                        await setDoc(doc(db, "users", user.uid), {
+                            leadScoutsUsedInCycle: nextScouts,
+                            cycleStart: effectiveCycleStart,
+                            lastActiveTimestamp: Date.now()
+                        }, { merge: true });
+                    } catch (e) {
+                        console.warn("Could not update leadScoutsUsedInCycle in Firestore:", e);
+                    }
+                }
+
+                // Record in Firestore scouted_leads collection with userId matching security rules
                 for (const lead of enriched) {
                     try {
                         await addDoc(collection(db, "scouted_leads"), lead);
@@ -5043,7 +5739,12 @@
                 }
 
                 try {
-                    await setDoc(doc(db, "users", userIdOrEmail), { subscriptionPlan: newPlan }, { merge: true });
+                    await setDoc(doc(db, "users", userIdOrEmail), {
+                        subscriptionPlan: newPlan,
+                        plan: newPlan,
+                        planUpdatedAt: new Date().toISOString()
+                    }, { merge: true });
+                    showToast(`Updated user tier to ${getTierConfig(newPlan).name}`, 'success');
                 } catch (e) {
                     console.warn("Could not update user plan in Firestore:", e);
                 }
@@ -5068,8 +5769,10 @@
                 try {
                     const userRef = doc(db, "users", userIdOrEmail);
                     const snap = await getDoc(userRef);
-                    const currentBal = snap.exists() ? (snap.data().creditsBalance || 0) : 0;
-                    await setDoc(userRef, { creditsBalance: currentBal + creditDelta }, { merge: true });
+                    const currentBal = snap.exists() ? (snap.data().creditsBalance ?? snap.data().credits ?? 0) : 0;
+                    const nextBal = currentBal + creditDelta;
+                    await setDoc(userRef, { creditsBalance: nextBal, credits: nextBal }, { merge: true });
+                    showToast(`Granted +${creditDelta} credits (balance: ${nextBal})`, 'success');
                 } catch (e) {
                     console.warn("Could not update credits in Firestore:", e);
                 }
@@ -5113,11 +5816,9 @@
                                 className="flex items-center gap-3 cursor-pointer group select-none transition-transform active:scale-[0.98]"
                                 title="GBP Auditor Pro - Home"
                             >
-                                <!-- Rounded Squircle Icon Badge with Glowing Gradient Border -->
-                                <div className="relative p-[2px] rounded-2xl bg-gradient-to-tr from-rose-500 via-red-500 to-amber-400 shadow-md shadow-red-500/20 group-hover:shadow-red-500/40 transition-all">
-                                    <div className="w-10 h-10 sm:w-11 sm:h-11 bg-[#0c101d] rounded-[14px] flex items-center justify-center font-black text-xs sm:text-sm text-white tracking-wider">
-                                        GBP
-                                    </div>
+                                <!-- Brand Icon Badge -->
+                                <div className="relative rounded-2xl overflow-hidden shadow-md shadow-red-500/20 group-hover:shadow-red-500/40 transition-all border border-red-500/30">
+                                    <img src="/brand-logo.png" alt="GBP Auditor Pro" className="w-10 h-10 sm:w-11 sm:h-11 object-cover block" />
                                 </div>
 
                                 <!-- Brand Title with Vibrant Gradient and Pro Badge -->
@@ -5136,8 +5837,9 @@
                                 </div>
                             </div>
 
-                            <!-- Menu Button on Right -->
-                            <div className="relative inline-block text-left" ref=${navMenuRef}>
+                            <!-- Install Button & Menu Button on Right -->
+                            <div className="relative flex items-center gap-2.5 text-left" ref=${navMenuRef}>
+                                <${PWAInstallButton} variant="header" />
                                 <button 
                                     type="button"
                                     onClick=${() => setIsNavMenuOpen(!isNavMenuOpen)}
@@ -5257,6 +5959,9 @@
                                                 </span>
                                                 <span className="text-[10px] font-bold text-amber-200 bg-amber-950 border border-amber-600/50 px-2 py-0.5 rounded-md">Plans & Packs</span>
                                             </button>
+
+                                            <!-- Install App Button -->
+                                            <${PWAInstallButton} variant="menu" onAfterClick=${() => setIsNavMenuOpen(false)} />
                                         </div>
 
                                         <!-- User Account & Profile Section -->
@@ -5372,6 +6077,9 @@
                                     credits=${credits}
                                     history=${history.filter(h => h.userId === user?.uid)}
                                     auditsThisCycle=${auditsThisCycle}
+                                    auditsThisYear=${auditsThisYear}
+                                    leadScoutsUsedInCycle=${leadScoutsUsedInCycle}
+                                    userScoutedLeads=${userScoutedLeads}
                                     cycleDaysLeft=${cycleDaysLeft}
                                     cycleEndDate=${cycleEndDate}
                                     onRunAudit=${runAudit}
@@ -5383,6 +6091,7 @@
                                     onOpenPricing=${() => setShowPricingModal(true)}
                                     onViewAudit=${viewAudit}
                                     onGeneratePdf=${handleDirectPdfDownload}
+                                    onOrderService=${(service) => { setServiceOrderItem(service); setCopiedOrder(false); }}
                                     isAdmin=${isAdmin}
                                     paypalUrls=${paypalUrls}
                                     onGoToLanding=${() => setCurrentView('landing')}
@@ -5423,6 +6132,73 @@
                             `}
                         </main>
 
+                        <!-- In-App Toast Banner -->
+                        ${toastMessage && html`
+                            <div className="fixed bottom-6 right-6 z-50 max-w-md animate-fade-in">
+                                <div className=${`px-5 py-3.5 rounded-2xl shadow-2xl border flex items-center gap-3 text-xs sm:text-sm font-bold ${toastMessage.type === 'error' ? 'bg-red-900 text-white border-red-700' : 'bg-gray-900 text-white border-gray-700'}`}>
+                                    <${CheckCircleIcon} size=${18} className=${toastMessage.type === 'error' ? 'text-red-300 shrink-0' : 'text-emerald-400 shrink-0'} />
+                                    <span className="flex-1">${toastMessage.text}</span>
+                                    <button
+                                        type="button"
+                                        onClick=${() => setToastMessage(null)}
+                                        className="p-1 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white cursor-pointer"
+                                        aria-label="Dismiss notification"
+                                    >
+                                        <${XIcon} size=${14} />
+                                    </button>
+                                </div>
+                            </div>
+                        `}
+
+                        <!-- Service Order Fulfillment Modal -->
+                        ${serviceOrderItem && html`
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+                                <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-gray-100 space-y-6">
+                                    <div className="flex justify-between items-start gap-4">
+                                        <div>
+                                            <span className="px-2.5 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-black uppercase tracking-wider">Managed SEO Service</span>
+                                            <h3 className="text-2xl font-black text-gray-900 mt-1">${serviceOrderItem.title} — $${serviceOrderItem.price}</h3>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick=${() => setServiceOrderItem(null)}
+                                            className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 cursor-pointer"
+                                        >
+                                            <${XIcon} size=${20} />
+                                        </button>
+                                    </div>
+                                    <p className="text-sm text-gray-600 leading-relaxed">${serviceOrderItem.description}</p>
+                                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs space-y-1.5 text-gray-700">
+                                        <div><span className="font-bold text-gray-500">Target Business:</span> <span className="font-black text-gray-900">${activeBusiness || 'Not specified'}</span></div>
+                                        <div><span className="font-bold text-gray-500">Market / Location:</span> <span className="font-black text-gray-900">${activeBusinessDetails?.location || userProfile?.defaultLocation || 'Not specified'}</span></div>
+                                        <div><span className="font-bold text-gray-500">Requested By:</span> <span className="font-black text-gray-900">${user?.email || userProfile?.email || 'Guest'}</span></div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <a
+                                            href=${`mailto:customerservice.mme365@gmail.com?subject=${encodeURIComponent(`Service Order Request: ${serviceOrderItem.title} ($${serviceOrderItem.price}) - ${activeBusiness || 'GBP Audit'}`)}&body=${encodeURIComponent(`Hello Marketing Management Enterprise Team,\n\nI would like to order ${serviceOrderItem.title} ($${serviceOrderItem.price}).\n\nTarget Business: ${activeBusiness || 'N/A'}\nLocation: ${activeBusinessDetails?.location || 'N/A'}\nWebsite: ${activeBusinessDetails?.website || 'N/A'}\nContact Email: ${user?.email || 'N/A'}\nPhone: ${userProfile?.phoneNumber || 'N/A'}\n`)}`}
+                                            className="flex-1 py-3.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider text-center shadow-md transition-all"
+                                        >
+                                            Send Order via Email
+                                        </a>
+                                        <button
+                                            type="button"
+                                            onClick=${async () => {
+                                                const details = `Service: ${serviceOrderItem.title} ($${serviceOrderItem.price})\nBusiness: ${activeBusiness || 'N/A'}\nLocation: ${activeBusinessDetails?.location || 'N/A'}\nAccount: ${user?.email || 'N/A'}\nContact: customerservice.mme365@gmail.com`;
+                                                try {
+                                                    await navigator.clipboard.writeText(details);
+                                                    setCopiedOrder(true);
+                                                    setTimeout(() => setCopiedOrder(false), 2500);
+                                                } catch (e) {}
+                                            }}
+                                            className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer"
+                                        >
+                                            <${CopyIcon} size=${14} /> ${copiedOrder ? 'Copied!' : 'Copy Details'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `}
+
                         <!-- Pricing & Credits Modal -->
                         <${PricingAndCreditsModal}
                             isOpen=${showPricingModal}
@@ -5430,7 +6206,7 @@
                             currentPlan=${plan}
                             creditsBalance=${credits}
                             auditsThisMonth=${auditsThisCycle}
-                            auditsThisYear=${history.length}
+                            auditsThisYear=${auditsThisYear}
                             onSelectPlan=${handleSelectPlan}
                             onAddCredits=${handleAddCredits}
                             paypalUrls=${paypalUrls}
@@ -5461,6 +6237,8 @@
                             <a href="#reviews" onClick=${() => { setCurrentView('landing'); }} className="hover:text-gray-900 transition-colors">Reviews</a>
                         </div>
                     </footer>
+
+                    <${OfflineIndicator} />
 
                     <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-0">
                         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-red-50 rounded-full blur-[120px] opacity-60"></div>
