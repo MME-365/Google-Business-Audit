@@ -51,6 +51,25 @@
                 };
             });
 
+            // Clean up any stale Vite PWA dev service worker that can stall preview loading
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    var reloaded = false;
+                    regs.forEach(function(reg) {
+                        var url = (reg.active && reg.active.scriptURL) || (reg.installing && reg.installing.scriptURL) || (reg.waiting && reg.waiting.scriptURL) || '';
+                        if (url.indexOf('dev-sw') !== -1) {
+                            reg.unregister().then(function(ok) {
+                                if (ok && !reloaded && !sessionStorage.getItem('gbp_sw_cleaned')) {
+                                    reloaded = true;
+                                    sessionStorage.setItem('gbp_sw_cleaned', '1');
+                                    window.location.reload();
+                                }
+                            });
+                        }
+                    });
+                }).catch(function() {});
+            }
+
             // Mock Provider to preempt extension injection and stop connection errors
             if (!window.ethereum) {
                 const silent = { request: () => Promise.resolve([]), on: () => {}, removeListener: () => {}, isMetaMask: false };
@@ -122,7 +141,13 @@
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
-    <div id="root"></div>
+    <div id="root">
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f9fafb;font-family:Inter,system-ui,sans-serif;padding:24px;text-align:center;">
+            <img src="/brand-logo.png" alt="GBP Auditor Pro" style="width:56px;height:56px;border-radius:16px;margin-bottom:16px;box-shadow:0 8px 24px rgba(220,38,38,0.18);" />
+            <div style="font-size:18px;font-weight:800;color:#111827;">Loading GBP Auditor Pro...</div>
+            <div style="font-size:13px;color:#6b7280;margin-top:6px;">Initializing local SEO workspace</div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -130,6 +155,7 @@
         import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         (async () => {
+          try {
             // Inlined config for robust embedding and cross-origin persistence
             const firebaseConfig = {
                 "projectId": "gen-lang-client-0434515960",
@@ -246,7 +272,7 @@
         const getTierConfig = (planId) => TIER_CONFIG[planId] || TIER_CONFIG.free;
 
         const GoogleIcon = (props) => html`
-            <svg ...props viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+            <svg ...${props} viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .67-2.28 1.07-3.71 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                 <path d="M5.84 14.11c-.22-.66-.35-1.35-.35-2.06 0-.71.13-1.4.35-2.06V7.15H2.18C1.43 8.62 1 10.26 1 12s.43 3.38 1.18 4.85l3.66-2.84z" fill="#FBBC05"/>
@@ -655,7 +681,7 @@
             </div>
         `;
 
-        const Loader = () => html`
+        const Loader = ({ title = 'Conducting Deep Audit...', subtitle = 'Analyzing GMB signals and local SEO performance' } = {}) => html`
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm animate-pulse">
                 <div className="relative">
                     <${SettingsIcon} size=${48} className="text-red-600 spin-slow" />
@@ -663,8 +689,8 @@
                         <div className="w-2 h-2 bg-red-600 rounded-full"></div>
                     </div>
                 </div>
-                <h3 className="mt-6 text-xl font-bold text-gray-900">Conducting Deep Audit...</h3>
-                <p className="mt-2 text-gray-500">Analyzing GMB signals and local SEO performance</p>
+                <h3 className="mt-6 text-xl font-bold text-gray-900">${title}</h3>
+                <p className="mt-2 text-gray-500">${subtitle}</p>
                 <div className="mt-8 flex gap-2">
                     <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-red-600 rounded-full animate-bounce [animation-delay:0.2s]"></div>
@@ -5444,15 +5470,45 @@
             }, []);
 
             useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    setIsInitialLoading(false);
-                    // When user authenticates, transition to Dashboard if they were on Landing
-                    if (u) {
-                        setCurrentView(prev => prev === 'landing' ? 'dashboard' : prev);
+                let settled = false;
+                const fallbackTimer = setTimeout(() => {
+                    if (!settled) {
+                        settled = true;
+                        setIsInitialLoading(false);
                     }
-                });
-                return unsubscribe;
+                }, 2500);
+
+                let unsubscribe = () => {};
+                try {
+                    unsubscribe = onAuthStateChanged(
+                        auth,
+                        (u) => {
+                            settled = true;
+                            clearTimeout(fallbackTimer);
+                            setUser(u);
+                            setIsInitialLoading(false);
+                            // When user authenticates, transition to Dashboard if they were on Landing
+                            if (u) {
+                                setCurrentView(prev => prev === 'landing' ? 'dashboard' : prev);
+                            }
+                        },
+                        (err) => {
+                            settled = true;
+                            clearTimeout(fallbackTimer);
+                            console.warn("Auth state observer fallback:", err);
+                            setIsInitialLoading(false);
+                        }
+                    );
+                } catch (err) {
+                    settled = true;
+                    clearTimeout(fallbackTimer);
+                    console.warn("Failed to attach auth listener:", err);
+                    setIsInitialLoading(false);
+                }
+                return () => {
+                    clearTimeout(fallbackTimer);
+                    if (typeof unsubscribe === 'function') unsubscribe();
+                };
             }, []);
 
             // Check if current user is an authorized admin
@@ -6042,7 +6098,7 @@
                 setActiveDashboardTab('run');
             };
 
-            if (isInitialLoading) return html`<${Loader} />`;
+            if (isInitialLoading) return html`<${Loader} title="Loading GBP Auditor Pro..." subtitle="Preparing your workspace" />`;
 
             return html`
                 <div className="min-h-screen bg-gray-50 flex flex-col justify-between relative selection:bg-red-500 selection:text-white">
@@ -6502,8 +6558,48 @@
             `;
         };
 
+        class AppErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, message: '' };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true, message: error?.message || 'Unexpected render error' };
+            }
+            componentDidCatch(error, info) {
+                console.error('AppErrorBoundary caught:', error, info);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return html`
+                        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+                            <div className="max-w-md w-full bg-white rounded-3xl border border-gray-200 p-8 text-center shadow-lg space-y-4">
+                                <h2 className="text-xl font-black text-gray-900">Unable to display this view</h2>
+                                <p className="text-xs text-gray-500 font-mono break-words">${this.state.message}</p>
+                                <button
+                                    type="button"
+                                    onClick=${() => window.location.reload()}
+                                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-black cursor-pointer"
+                                >
+                                    Reload App
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                return this.props.children;
+            }
+        }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(html`<${App} />`);
+        root.render(html`<${AppErrorBoundary}><${App} /><//>`);
+      } catch (bootErr) {
+        console.error('Fatal boot error:', bootErr);
+        const rootEl = document.getElementById('root');
+        if (rootEl) {
+            rootEl.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif;background:#f9fafb;"><div style="max-width:420px;width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:32px;text-align:center;"><h2 style="font-size:20px;font-weight:900;color:#111827;margin:0 0 8px;">App failed to initialize</h2><p style="font-size:13px;color:#6b7280;margin:0 0 20px;">' + String(bootErr && bootErr.message || bootErr) + '</p><button onclick="window.location.reload()" style="padding:12px 24px;background:#dc2626;color:#fff;border:none;border-radius:14px;font-weight:800;font-size:13px;cursor:pointer;">Reload App</button></div></div>';
+        }
+      }
     })();
     </script>
 </body>

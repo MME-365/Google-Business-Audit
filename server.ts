@@ -224,8 +224,40 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    app.get("/@vite/client", (_req, res) => {
+      res.type("application/javascript").send(
+        `export class ErrorOverlay {}\n` +
+        `export const createHotContext = () => ({ accept() {}, dispose() {}, prune() {}, decline() {}, invalidate() {}, on() {}, off() {}, send() {}, data: {} });\n` +
+        `export const injectQuery = (url) => url;\n` +
+        `export const removeStyle = () => {};\n` +
+        `export const updateStyle = () => {};\n`
+      );
+    });
+
+    app.get("/manifest.webmanifest", (_req, res) => {
+      res.type("application/manifest+json").json({
+        id: "/",
+        name: "GBP Auditor Pro",
+        short_name: "GBP Auditor",
+        description: "AI-driven Google Business Profile auditor, 6-pillar diagnostic, vector PDF generator, and regional lead prospector.",
+        theme_color: "#080c16",
+        background_color: "#080c16",
+        display: "standalone",
+        display_override: ["standalone", "minimal-ui"],
+        orientation: "portrait-primary",
+        start_url: "/",
+        scope: "/",
+        categories: ["business", "productivity", "utilities"],
+        icons: [
+          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/pwa-maskable-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+        ]
+      });
+    });
+
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);
